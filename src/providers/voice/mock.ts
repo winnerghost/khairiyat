@@ -33,7 +33,7 @@ export interface MockVoiceOptions {
   /** Lose the webhook for this call (only reconciliation will find it). */
   dropWebhook?: (scenario: Scenario, input: StartCallInput) => boolean;
   /** Deliver each webhook twice (tests idempotency). */
-  duplicateWebhooks?: boolean;
+  duplicateWebhooks?: boolean | ((conversationId: string) => boolean);
   /** Send the audio webhook BEFORE the transcription one. */
   audioFirst?: boolean;
   seed?: number;
@@ -271,7 +271,11 @@ export function createMockVoiceProvider(
             "content-type": "application/json",
           });
           await deliver(raw, headers);
-          if (options.duplicateWebhooks) await deliver(raw, headers);
+          const dup =
+            typeof options.duplicateWebhooks === "function"
+              ? options.duplicateWebhooks(row.conversationId)
+              : options.duplicateWebhooks;
+          if (dup) await deliver(raw, headers);
           n++;
         }
       }

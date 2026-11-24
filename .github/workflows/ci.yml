@@ -38,6 +38,10 @@ jobs:
         run: npm run format:check
       - name: Unit + integration tests
         run: npm test
+      - name: Virtual week simulation (50 parents, 7 days, outages, lost webhooks)
+        run: npm run simulate:week
+      - name: Scheduler load test (1,000 parents)
+        run: npm run loadtest:tick -- 1000 50
 
   postgres:
     name: Integration tests on real Postgres 16 (concurrency)
