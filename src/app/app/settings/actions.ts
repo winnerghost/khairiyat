@@ -9,6 +9,7 @@ import { normalizePhone } from "@/lib/phone";
 import { isValidTimeZone } from "@/lib/time";
 import { deleteAccount } from "@/server/account";
 import { createInvitation } from "@/server/families";
+import { rateLimit } from "@/server/rate-limit";
 import { requireMember } from "@/server/session";
 
 export async function savePreferencesAction(formData: FormData) {
@@ -58,6 +59,7 @@ export async function savePreferencesAction(formData: FormData) {
 
 export async function inviteAction(formData: FormData) {
   const { db, family, user } = await requireMember();
+  if (!rateLimit(`invite:${user.id}`, 10, 3600_000)) redirect("/app/settings?error=slow");
   const email = z.email().safeParse(
     String(formData.get("email") ?? "")
       .trim()

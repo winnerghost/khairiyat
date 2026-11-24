@@ -28,6 +28,7 @@ const ERRORS: Record<string, string> = {
   owner: "Only the family owner can change this.",
   retention: "Pick between 30 and 730 days.",
   confirm: "Type DELETE to confirm. Nothing was deleted.",
+  slow: "Too many attempts. Please try again in a while.",
 };
 
 export default async function SettingsPage({ searchParams }: PageProps<"/app/settings">) {

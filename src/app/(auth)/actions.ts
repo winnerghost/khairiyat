@@ -49,7 +49,11 @@ export async function signupAction(
   _prev: AuthFormState,
   formData: FormData,
 ): Promise<AuthFormState> {
-  const parsed = signupSchema.safeParse(Object.fromEntries(formData));
+  const parsed = signupSchema.safeParse({
+    name: formData.get("name"),
+    email: formData.get("email"),
+    password: formData.get("password"),
+  });
   if (!parsed.success) {
     const fieldErrors: Record<string, string> = {};
     for (const i of parsed.error.issues) fieldErrors[String(i.path[0])] ??= i.message;
@@ -61,7 +65,7 @@ export async function signupAction(
   } catch (error) {
     return { error: apiErrorMessage(error, "We couldn't create your account. Please try again.") };
   }
-  redirect("/app");
+  redirect(safeNext(formData.get("next")));
 }
 
 const loginSchema = z.object({

@@ -7,6 +7,7 @@ import { getEnv } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { getSignedUrl } from "@/providers/voice/elevenlabs";
 import { elevenLabsConfig } from "@/server/providers";
+import { rateLimit } from "@/server/rate-limit";
 import { requireMember } from "@/server/session";
 import { renderFirstMessage } from "../../../../../agent/first-messages";
 
@@ -19,7 +20,9 @@ export async function POST() {
   const env = getEnv();
   if (env.modes.browserVoice !== "enabled")
     return Response.json({ error: "not configured" }, { status: 404 });
-  const { db, family, member } = await requireMember();
+  const { db, family, member, user } = await requireMember();
+  if (!rateLimit(`voice:${user.id}`, 10, 3600_000))
+    return Response.json({ error: "too many sessions" }, { status: 429 });
   const settings = await getSettings(db);
   if (!settings.feature_flags.browserVoiceDemo)
     return Response.json({ error: "disabled" }, { status: 404 });

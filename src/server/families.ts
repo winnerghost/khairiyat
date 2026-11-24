@@ -2,7 +2,7 @@
  * Families and membership. Every signed-in user belongs to a family; the
  * first person to sign up becomes its owner and can invite siblings.
  */
-import { and, asc, eq, gt, isNull } from "drizzle-orm";
+import { and, asc, eq, gt } from "drizzle-orm";
 import { familyMembers, families, invitations, parents } from "@/db/schema/app";
 import type { DbOrTx } from "@/db/types";
 import { randomToken } from "@/lib/crypto";
@@ -88,15 +88,16 @@ export async function acceptInvitation(
   const [invite] = await db
     .select()
     .from(invitations)
-    .where(
-      and(
-        eq(invitations.token, input.token),
-        isNull(invitations.acceptedAt),
-        gt(invitations.expiresAt, input.now),
-      ),
-    )
+    .where(and(eq(invitations.token, input.token), gt(invitations.expiresAt, input.now)))
     .limit(1);
   if (!invite) return { ok: false, reason: "invalid" };
+  if (invite.acceptedAt) {
+    // A used link only works again for the person who already joined with it.
+    const mine = await getMembership(db, input.userId);
+    return mine?.family.id === invite.familyId
+      ? { ok: true, familyId: invite.familyId }
+      : { ok: false, reason: "invalid" };
+  }
 
   const current = await getMembership(db, input.userId);
   if (current && current.family.id === invite.familyId)

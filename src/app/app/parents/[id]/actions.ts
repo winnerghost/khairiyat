@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { problemReports } from "@/db/schema/app";
+import { and, eq } from "drizzle-orm";
+import { checkIns, problemReports } from "@/db/schema/app";
 import { zonedToInstant } from "@/lib/time";
 import {
   addNextCallNote,
@@ -14,6 +15,7 @@ import {
   resumeParent,
   skipToday,
 } from "@/server/parents";
+import { rateLimit } from "@/server/rate-limit";
 import { requireParent } from "@/server/session";
 
 function back(parentId: string, flag: string): never {
@@ -89,8 +91,17 @@ export async function deleteParentAction(parentId: string, formData: FormData) {
 
 export async function reportProblemAction(parentId: string, checkInId: string, formData: FormData) {
   const { db, parent, family, user } = await requireParent(parentId);
+  if (!rateLimit(`report:${user.id}`, 10, 3600_000))
+    redirect(`/app/parents/${parent.id}/calls/${checkInId}?report=invalid`);
   const message = z.string().trim().min(3).max(1000).safeParse(formData.get("message"));
   if (!message.success) redirect(`/app/parents/${parent.id}/calls/${checkInId}?report=invalid`);
+  // The call must belong to this parent (no cross-family ids).
+  const [owned] = await db
+    .select({ id: checkIns.id })
+    .from(checkIns)
+    .where(and(eq(checkIns.id, checkInId), eq(checkIns.parentId, parent.id)))
+    .limit(1);
+  if (!owned) redirect(`/app/parents/${parent.id}`);
   await db.insert(problemReports).values({
     familyId: family.id,
     parentId: parent.id,

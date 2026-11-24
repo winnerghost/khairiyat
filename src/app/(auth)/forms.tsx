@@ -51,10 +51,11 @@ export function LoginForm({ next }: { next?: string }) {
   );
 }
 
-export function SignupForm() {
+export function SignupForm({ next }: { next?: string }) {
   const [state, action] = useActionState(signupAction, initial);
   return (
     <form action={action} className="flex flex-col gap-4" noValidate>
+      <input type="hidden" name="next" value={next ?? "/app"} />
       {state.error && (
         <Callout tone="danger" role="alert">
           {state.error}

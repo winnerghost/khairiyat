@@ -43,7 +43,26 @@ export async function buildEngineDeps(db?: Db): Promise<EngineDeps> {
 
 export async function tickOnce(): Promise<TickStats> {
   if (globalForTicker.__khairiyatTickerPaused) return { ran: false };
-  return runTick(await buildEngineDeps());
+  const stats = await runTick(await buildEngineDeps());
+  await pingHeartbeat(stats);
+  return stats;
+}
+
+/**
+ * Healthchecks.io heartbeat: if ticks stop arriving, Healthchecks alerts
+ * the founder (https://healthchecks.io/docs/http_api/ : GET the ping URL,
+ * or "<url>/fail" to report a failure).
+ */
+async function pingHeartbeat(stats: TickStats): Promise<void> {
+  const url = getEnv().HEALTHCHECKS_PING_URL;
+  if (!url || !stats.ran) return;
+  try {
+    await fetch(stats.error ? `${url.replace(/\/$/, "")}/fail` : url, {
+      signal: AbortSignal.timeout(5000),
+    });
+  } catch (error) {
+    logger.warn("heartbeat ping failed", { error });
+  }
 }
 
 /** Run a tick soon (after "Call now"), without making the user wait for it. */

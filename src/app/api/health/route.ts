@@ -1,5 +1,8 @@
 import { connection } from "next/server";
+import { desc, eq } from "drizzle-orm";
 import { brand } from "@/config/brand";
+import { getDb } from "@/db/client";
+import { jobRuns } from "@/db/schema/app";
 import { EnvConfigError, getEnv } from "@/lib/env";
 import { logger } from "@/lib/logger";
 
@@ -16,16 +19,27 @@ export async function GET() {
 
   try {
     const env = getEnv();
+    const db = await getDb();
+    const [last] = await db
+      .select({ startedAt: jobRuns.startedAt, ok: jobRuns.ok })
+      .from(jobRuns)
+      .where(eq(jobRuns.job, "tick"))
+      .orderBy(desc(jobRuns.startedAt))
+      .limit(1);
+    const ageSecs = last ? Math.round((Date.now() - last.startedAt.getTime()) / 1000) : null;
+    // A scheduler that hasn't ticked for 3 minutes is an outage: answer 503 so uptime monitors alert.
+    const schedulerOk = ageSecs !== null && ageSecs <= 180;
     return Response.json(
       {
-        status: "ok",
+        status: schedulerOk ? "ok" : "scheduler_stale",
         app: brand.name,
         environment: env.APP_ENV,
         demo: env.isDemo,
         modes: env.modes,
+        scheduler: { lastTickSecondsAgo: ageSecs, lastTickOk: last?.ok ?? null },
         time: new Date().toISOString(),
       },
-      { headers: { "Cache-Control": "no-store" } },
+      { status: schedulerOk ? 200 : 503, headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
     if (error instanceof EnvConfigError) {

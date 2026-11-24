@@ -1,93 +1,96 @@
 # Go-live checklist
 
-Everything needed before **real families** use Khairiyat. Items are in the order to start them, with the **slow ones first** (approvals can take weeks). Tick each box only when it's done and tested.
+**Nothing in this file is needed for the demo.** The demo runs on your laptop with no accounts (see the README). Use this list only when you decide to serve real families.
 
-> Facts marked **(verify)** come from research on 24 Nov 2026 and must be re-checked with the provider before relying on them.
+Items are in the order to start them, **slow ones first** (approvals can take weeks). Facts marked **(verify)** come from research on 24 Nov 2026; re-check them with the provider.
 
-## A. Start now (long lead time, not needed for Phases 0–2)
+## A. Start early (long lead time)
 
 ### A1. Register the business
 
-Every provider below (telephony KYC, WhatsApp Business verification, Razorpay) asks for business documents.
+Telephony KYC, WhatsApp Business verification and Razorpay all ask for business documents.
 
-- [ ] Register as a **sole proprietorship** via **Udyam** (free, online, uses Aadhaar + PAN). An LLP or Pvt Ltd also works but costs more.
-- [ ] Open a **current account** in the business name.
-- [ ] Decide on GST registration (not mandatory below the turnover threshold. Some providers ask for it, so confirm each one's document list).
-- [ ] Keep scanned copies ready: PAN, Aadhaar, Udyam certificate, bank proof, address proof.
+- [ ] Sole proprietorship via **Udyam** (free, online, Aadhaar + PAN), or LLP / Pvt Ltd
+- [ ] Current account in the business name
+- [ ] Decide on GST (Admin → Settings → GST invoices, switch on only once registered)
 
-### A2. Telephony for Indian calls (the biggest open decision)
+### A2. Telephony for Indian calls (biggest open decision)
 
 Findings **(verify)**:
 
-- ElevenLabs' Plivo guide says calls to/from India over a SIP trunk need the ElevenLabs deployment **in India ("India residency")**, set up by contacting **ElevenLabs sales**. Otherwise calls fail with "Domestic Anchored Terms not met". India SIP URI: `sip.rtc.in.residency.elevenlabs.io`. Plivo Indian numbers need KYC.
-- ElevenLabs' **Ozonetel** page also requires an IN-residency account "per TRAI regulations" (SIP trunk, Ozonetel KYC).
-- ElevenLabs' **Exotel** page uses a **WebSocket bridge** (no SIP, IN residency "not required"). Calls are started via **Exotel's own "Make a Call" API**, and you must host a small always-on bridge server (not free: about $5–10 a month, or Google Cloud Run's free tier).
-- TRAI rolled out the **1601-series** for non-banking service/transactional calls in phases from Aug 2026, starting with utilities, courier and logistics. It does **not** yet clearly apply to us. Re-check before launch. Our calls must stay **service calls with consent**, never promotional.
+- ElevenLabs' Plivo guide: calls to/from India over a SIP trunk need the ElevenLabs deployment **in India ("India residency")**, set up via **ElevenLabs sales**; otherwise "Domestic Anchored Terms not met". Indian Plivo numbers need KYC.
+- ElevenLabs' **Ozonetel** page: needs an IN-residency account "per TRAI regulations".
+- ElevenLabs' **Exotel** page: WebSocket bridge, IN residency "not required", calls started via Exotel's own API, and you host a small always-on bridge server (not free).
+- TRAI's **1601 series** for non-banking service calls is rolling out by sector (from Aug 2026). Not yet shown to apply to us; re-check. Calls must stay **service calls with consent**, never promotional.
 
 To do:
 
-- [ ] Email **ElevenLabs sales**: India residency price, minimum plan, and whether the existing workspace can move.
-- [ ] Ask **Exotel**, **Plivo**, **Ozonetel** (and Tata Tele Business Services) for per-minute prices, KYC document lists and setup time.
-- [ ] Pick a route (decided in Phase 3, then documented here with exact setup steps).
-- [ ] Testing only: the existing ElevenLabs number **+91 91199 92192** (Twilio) is used for the first test call to the founder's phone.
+- [ ] Ask ElevenLabs sales about India residency (price, plan). If you use it, set `ELEVENLABS_API_BASE=https://api.in.residency.elevenlabs.io` (verify host)
+- [ ] Quotes and KYC lists from Exotel, Plivo, Ozonetel, Tata Tele
+- [ ] For testing now: your existing ElevenLabs number **+91 91199 92192** (Twilio) works with `ELEVENLABS_TELEPHONY=twilio`
 
 ### A3. Domain
 
-- [ ] Buy a domain (~₹800 a year). Needed to send email (Resend requires a verified domain) and to look trustworthy for WhatsApp verification.
+- [ ] Buy a domain (~₹800/year). Needed for email sending and WhatsApp verification.
 
-## B. Accounts (all free tiers)
+## B. Real voice (can be done now, uses your ElevenLabs credits)
 
-- [ ] **Supabase**: create a project in **Mumbai (ap-south-1)** (the region can't be changed later). Enable `pg_cron` and `pg_net`.
-- [ ] **Netlify**: create a site from the GitHub repo. First, re-read Netlify's Self-Serve Subscription Agreement to confirm the free plan allows commercial use.
-- [ ] **Sentry**: free Developer plan → `SENTRY_DSN`.
-- [ ] **Healthchecks.io**: one check with period 1 min, grace 3 min → `HEALTHCHECKS_PING_URL`. Alerts go to your phone and email.
-- [ ] **Resend**: verify the domain (SPF/DKIM DNS records) → `RESEND_API_KEY`, `EMAIL_FROM`.
-- [ ] **Google sign-in** (optional): OAuth client in Google Cloud Console → `GOOGLE_CLIENT_ID/SECRET`.
+### B1. Agent
 
-## C. Providers (each phase adds exact steps here)
+- [ ] ElevenLabs → API keys → create key → `.env.local`: `ELEVENLABS_API_KEY=…`
+- [ ] Pick a warm Hindi female voice (and a male one) from your voice library → `ELEVENLABS_VOICE_ID_FEMALE`, `ELEVENLABS_VOICE_ID_MALE`
+- [ ] `npm run agent:sync` → copy the printed `ELEVENLABS_AGENT_ID` into `.env.local` (run it again after any change in `agent/`)
+- [ ] `npm run demo` → Demo room → **Talk to Roshni** in the browser. Check: Hindi quality, slow pace, disclosure, the consent flow, red-flag handling
 
-- [ ] **ElevenLabs** _(Phase 3)_: API key, agent created by `npm run agent:sync`, phone number ID, post-call webhook URL + secret. Set conversation retention to match ours.
-- [ ] **WhatsApp Cloud API** _(Phase 4)_: Meta Business account, business verification, phone number, the 6 utility templates submitted (texts in `docs/whatsapp-templates.md`), webhook URL + verify token, current per-message price checked.
-- [ ] **Razorpay** _(Phase 5)_: KYC, Subscriptions enabled, **international cards** enabled, plans created, webhook URL + secret.
+### B2. First real test call to your own phone
 
-## D. Production configuration
+- [ ] ElevenLabs → Phone numbers → copy the id of +91 91199 92192 → `ELEVENLABS_PHONE_NUMBER_ID=phnum_…`, `ELEVENLABS_TELEPHONY=twilio`
+- [ ] `npm run call:test -- +91YOURNUMBER female daily "your name"`. Your phone rings; try "theek hai", "robot ho?", "phone mat karo", "gir gaya tha"
+- [ ] Open ElevenLabs → Agents → Conversations to read the transcript and data collection results
 
-- [ ] Generate secrets: `DATA_ENCRYPTION_KEY` (`openssl rand -base64 32`), `BETTER_AUTH_SECRET`, `CRON_SECRET`. Store a copy of the encryption key **offline**: losing it means losing encrypted data.
-- [ ] Set all env vars in Netlify and Supabase (Edge Function secrets). `APP_ENV=production`, `APP_URL=https://…`
-- [ ] Apply database migrations, RLS and guard SQL. Schedule the pg_cron tick.
-- [ ] Set `ADMIN_EMAILS`.
+### B3. Webhooks (results flowing into the app)
 
-## E. Safety nets
+- [ ] The app must be reachable on the internet (deployed, or a tunnel for testing)
+- [ ] ElevenLabs → Agents → Settings → Webhooks: add `https://YOUR-DOMAIN/api/webhooks/elevenlabs` with HMAC enabled; copy the secret → `ELEVENLABS_WEBHOOK_SECRET`; events: transcript, audio, call initiation failure
+- [ ] Optional: put the webhook id in `ELEVENLABS_POST_CALL_WEBHOOK_ID` and re-run `npm run agent:sync`
+- [ ] With all four ElevenLabs keys set, voice is "real": Demo room "Call now" places real calls (only to your own test number!)
 
-- [ ] Nightly encrypted backup job running (GitHub Actions) **and a restore tested** once.
-- [ ] Healthchecks.io alert tested (pause the tick and confirm you get a message).
-- [ ] Sentry receives a test error.
-- [ ] RUNBOOK read once end to end.
+## D. Hosting (free tiers)
+
+- [ ] **Supabase**: project in **Mumbai (ap-south-1)** (region can't change later). Copy the pooler connection string (transaction mode, port 6543) → `DATABASE_URL`. Migrations run automatically on first start.
+- [ ] **Netlify**: new site from the GitHub repo; set all env vars; `APP_ENV=production`, `APP_URL=https://YOUR-DOMAIN`. Re-read Netlify's agreement to confirm the free plan allows commercial use.
+- [ ] Secrets: `DATA_ENCRYPTION_KEY` (`openssl rand -base64 32`, keep an offline copy: losing it loses health notes), `BETTER_AUTH_SECRET`, `CRON_SECRET`, `ADMIN_EMAILS`
+- [ ] Scheduler: run `supabase/sql/cron.sql` in the Supabase SQL editor (pg_cron → `/api/cron/tick` every minute)
+- [ ] Monitoring: Healthchecks.io check (period 1 min, grace 3 min) → `HEALTHCHECKS_PING_URL`; an uptime monitor on `/api/health` (returns 503 if the scheduler stalls)
+- [ ] Backups: Supabase free has none. Nightly `pg_dump` (e.g. a GitHub Action) encrypted, and **test a restore once**. Upgrade to Supabase Pro (~$25/month) at ~10 paying families.
+
+## E. Still to build before real families (next development step)
+
+- [ ] **WhatsApp Cloud API provider** (Meta): business verification, phone number, submit the templates in [whatsapp-templates.md](whatsapp-templates.md), delivery/read status webhook, verify per-message price
+- [ ] **Email provider** (Resend or similar): verify domain (SPF/DKIM); also used for password-reset emails
+- [ ] **Razorpay Subscriptions**: KYC, Subscriptions + international cards enabled, plans created, checkout + payment signature verification + webhooks (`X-Razorpay-Signature`)
+- [ ] **Error monitoring**: add Sentry (free Developer plan) with `SENTRY_DSN`
+- [ ] Each must be built from the provider's current official docs, with the doc URL in a code comment (AGENTS.md rule)
 
 ## F. Legal and trust
 
-- [ ] Privacy Policy, Terms, and the "Not an emergency service" notice reviewed by a lawyer (drafts in `docs/legal/`, marked DRAFT).
-- [ ] Privacy policy states where data is processed (Supabase Mumbai; ElevenLabs outside India unless India residency is used).
+- [ ] Lawyer review of `/privacy`, `/terms`, `/not-an-emergency-service` (texts in `src/content/legal/`, marked DRAFT; fill the [placeholders])
+- [ ] Rewrite the founder note in your own words (`src/content/landing.ts`)
+- [ ] Privacy policy lists exact providers and where they process data (ElevenLabs outside India unless India residency)
 
 ## G. Final rehearsal
 
-- [ ] Full flow on a real phone: sign up → onboarding → consent call → daily call → WhatsApp summary → not-reached alert → red-flag alert → billing → export → delete.
-- [ ] `npm run simulate:week` and `npm run loadtest:tick` pass on the production database settings.
-
-## Upgrade triggers (when free stops being enough)
-
-| When                                            | Upgrade                                                       |
-| ----------------------------------------------- | ------------------------------------------------------------- |
-| ~10 paying families                             | Supabase Pro ($25 a month): managed daily backups, no pausing |
-| Netlify credits >70% in a month                 | Netlify Pro, or move the website                              |
-| More than ~45 parents want the same 9–10am hour | Higher ElevenLabs plan (more concurrent calls)                |
+- [ ] Real phone, real family member: sign up → onboarding → consent call → daily call → WhatsApp summary → not-reached alert → red-flag alert → payment → export → delete
+- [ ] `npm run simulate:week` and `npm run loadtest:tick` pass; CI green
+- [ ] Read [RUNBOOK.md](RUNBOOK.md) once end to end
 
 ## Sources (research, 24 Nov 2026)
 
 - Plivo × ElevenLabs India: https://www.plivo.com/docs/voice-agents/sip-trunking/integration-guides/elevenlabs.md
 - ElevenLabs × Exotel: https://elevenlabs.io/agents/integrations/exotel
 - ElevenLabs × Ozonetel: https://elevenlabs.io/agents/integrations/ozonetel
+- ElevenLabs outbound calls, webhooks, agents API: https://elevenlabs.io/docs/eleven-agents/
 - TRAI 1601 series (Aug 2026): https://trai.gov.in/sites/default/files/2026-08/PR_No113of2026_1.pdf
 - Vercel Hobby (non-commercial): https://vercel.com/docs/accounts/plans/hobby-plan
 - Netlify credits: https://docs.netlify.com/manage/accounts-and-billing/billing/billing-for-credit-based-plans/how-credits-work/
-- Supabase limits: https://supabase.com/docs/guides/functions/limits · pausing: https://supabase.com/docs/guides/platform/project-pausing · regions: https://supabase.com/docs/guides/platform/regions
+- Supabase limits / pausing / regions / cron: https://supabase.com/docs/guides/functions/limits · https://supabase.com/docs/guides/platform/project-pausing · https://supabase.com/docs/guides/platform/regions · https://supabase.com/docs/guides/functions/schedule-functions

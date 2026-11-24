@@ -9,8 +9,13 @@ import { SignupForm } from "../forms";
 
 export const metadata: Metadata = { title: "Start your free trial" };
 
-export default async function SignupPage() {
-  if (await getSessionUser()) redirect("/app");
+export default async function SignupPage({ searchParams }: PageProps<"/signup">) {
+  const sp = await searchParams;
+  const next =
+    typeof sp.next === "string" && sp.next.startsWith("/") && !sp.next.startsWith("//")
+      ? sp.next
+      : undefined;
+  if (await getSessionUser()) redirect(next ?? "/app");
   const env = getEnv();
   return (
     <>
@@ -20,7 +25,7 @@ export default async function SignupPage() {
           Set up daily check-in calls for your parent in about 5 minutes.
         </p>
       </div>
-      <SignupForm />
+      <SignupForm next={next} />
       {env.modes.googleAuth === "enabled" && (
         <form action={googleAction}>
           <Button type="submit" variant="secondary" className="w-full">
@@ -30,7 +35,10 @@ export default async function SignupPage() {
       )}
       <p className="text-center text-base">
         Already have an account?{" "}
-        <Link href="/login" className="font-semibold text-primary underline">
+        <Link
+          href={next ? `/login?next=${encodeURIComponent(next)}` : "/login"}
+          className="font-semibold text-primary underline"
+        >
           Log in
         </Link>
       </p>
