@@ -45,6 +45,11 @@ export default defineConfig({
     env: {
       APP_ENV: "test",
       APP_URL: BASE_URL,
+      // A fresh in-memory demo database with a few days of demo history.
+      PGLITE_DATA_DIR: "memory://",
+      DEMO_SEED_DAYS: "4",
+      // Fast pretend calls for the tests.
+      LOCAL_TICK_MS: "2000",
     },
   },
 });

@@ -43,6 +43,7 @@ const brandVariables = {
   "--brand-foreground": brand.colors.foreground,
   "--brand-muted": brand.colors.muted,
   "--brand-success": brand.colors.success,
+  "--brand-info": brand.colors.info,
   "--brand-warning": brand.colors.warning,
   "--brand-danger": brand.colors.danger,
 } as CSSProperties;

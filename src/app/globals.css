@@ -13,6 +13,7 @@
   --color-foreground: var(--brand-foreground);
   --color-muted: var(--brand-muted);
   --color-success: var(--brand-success);
+  --color-info: var(--brand-info);
   --color-warning: var(--brand-warning);
   --color-danger: var(--brand-danger);
   --font-sans: var(--font-body), system-ui, sans-serif;

@@ -16,5 +16,7 @@ export default defineConfig({
       APP_ENV: "test",
     },
     restoreMocks: true,
+    testTimeout: 60_000,
+    hookTimeout: 60_000,
   },
 });

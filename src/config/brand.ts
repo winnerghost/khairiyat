@@ -43,6 +43,7 @@ export const brand = {
     foreground: "#2B2118", // deep brown ink
     muted: "#6F6257",
     success: "#2F7A52", // "Spoke at 9:12"
+    info: "#2F6690", // calm blue: "call planned", "on a call"
     warning: "#B7791F", // "Not reached, retrying"
     danger: "#B3261E", // urgent alerts
   },
