@@ -8,6 +8,7 @@
  * we use them to match the result back to our check-in.
  */
 import { and, asc, desc, eq, gt, isNull, or } from "drizzle-orm";
+import { renderFirstMessage } from "../../agent/first-messages";
 import { assistantNameFor } from "@/config/brand";
 import {
   callResults,
@@ -191,13 +192,22 @@ export async function buildCallContext(
   const news = notes.filter((n) => n.kind === "news").map((n) => n.text);
   const due = medicinesDueAt(meds, callLocal);
 
+  const familyMemberName = (owner?.name ?? "aapke bachche").split(" ")[0] ?? "aapke bachche";
   const dynamicVariables: DynamicVariables = {
+    first_message: renderFirstMessage({
+      addressAs: parent.addressAs,
+      assistantName: assistantNameFor(parent.voice),
+      familyMemberName,
+      language: parent.language,
+      gender: parent.voice,
+      isConsentCall: checkIn.isConsentCall,
+    }),
     parent_name: parent.name,
     address_as: parent.addressAs,
     assistant_name: assistantNameFor(parent.voice),
     /** Hindi verbs change with gender ("bol rahi hoon" / "bol raha hoon"). */
     assistant_gender: parent.voice,
-    family_member_name: (owner?.name ?? "aapke bachche").split(" ")[0] ?? "aapke bachche",
+    family_member_name: familyMemberName,
     language: LANGUAGE_LABELS[parent.language],
     hearing_difficulty: parent.hearingDifficulty ? "yes" : "no",
     medicines_due_now: cap(due.join(", ") || "none", 300),

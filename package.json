@@ -15,14 +15,17 @@
     "test:watch": "vitest",
     "e2e": "playwright test",
     "check": "npm run lint && npm run typecheck && npm run format:check && npm test",
-    "seed": "tsx scripts/seed.ts",
+    "seed": "tsx --env-file-if-exists=.env.local scripts/seed.ts",
     "db:generate": "drizzle-kit generate",
     "test:pg": "vitest run tests/integration",
     "simulate:week": "tsx scripts/simulate-week.ts",
-    "loadtest:tick": "tsx scripts/loadtest-tick.ts"
+    "loadtest:tick": "tsx scripts/loadtest-tick.ts",
+    "agent:sync": "tsx --env-file-if-exists=.env.local scripts/agent-sync.ts",
+    "call:test": "tsx --env-file-if-exists=.env.local scripts/test-call.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.6.0",
+    "@elevenlabs/client": "^1.38.0",
     "better-auth": "^1.7.28",
     "drizzle-orm": "^0.45.4",
     "libphonenumber-js": "^1.13.17",

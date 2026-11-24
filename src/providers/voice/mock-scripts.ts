@@ -83,6 +83,8 @@ function medsAnswer(names: string[], missed: string[] = []): string {
 }
 
 function opening(vars: Vars): Turn[] {
+  const first = v(vars, "first_message");
+  if (first) return [{ role: "agent", message: first }];
   const a = v(vars, "address_as", "ji");
   const name = v(vars, "assistant_name", "Roshni");
   const fam = v(vars, "family_member_name", "aapke bachche");

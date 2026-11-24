@@ -58,6 +58,12 @@ const rawSchema = z.object({
   ELEVENLABS_PHONE_NUMBER_ID: optionalString,
   ELEVENLABS_WEBHOOK_SECRET: optionalString,
   ELEVENLABS_TELEPHONY: z.enum(["twilio", "sip_trunk"]).default("twilio"),
+  /** Optional: a regional API host, e.g. https://api.in.residency.elevenlabs.io */
+  ELEVENLABS_API_BASE: z.url().default("https://api.elevenlabs.io"),
+  ELEVENLABS_VOICE_ID_FEMALE: optionalString,
+  ELEVENLABS_VOICE_ID_MALE: optionalString,
+  /** Optional: workspace webhook id that agent:sync attaches to the agent. */
+  ELEVENLABS_POST_CALL_WEBHOOK_ID: optionalString,
 
   // WhatsApp Cloud API (Meta)
   WHATSAPP_ACCESS_TOKEN: optionalString,
@@ -112,6 +118,8 @@ export interface ProviderModes {
   email: "resend" | "mock";
   payments: "razorpay" | "mock";
   googleAuth: "enabled" | "disabled";
+  /** "Talk to the assistant in your browser": needs only the API key and agent id. */
+  browserVoice: "enabled" | "disabled";
 }
 
 export interface AppEnv extends RawEnv {
@@ -145,7 +153,14 @@ function providerState(raw: RawEnv, name: ProviderName): "real" | "mock" | strin
  * Pure function: safe to call in tests with a hand-made object.
  */
 export function parseEnv(source: Record<string, string | undefined>): AppEnv {
-  const parsed = rawSchema.safeParse(source);
+  // An empty line in .env ("KEY=") means "not set".
+  const cleaned = Object.fromEntries(
+    Object.entries(source).map(([k, v]) => [
+      k,
+      typeof v === "string" && v.trim() === "" ? undefined : v,
+    ]),
+  );
+  const parsed = rawSchema.safeParse(cleaned);
   if (!parsed.success) {
     throw new EnvConfigError(
       parsed.error.issues.map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`),
@@ -158,6 +173,14 @@ export function parseEnv(source: Record<string, string | undefined>): AppEnv {
   const states = Object.fromEntries(
     (Object.keys(PROVIDER_KEYS) as ProviderName[]).map((name) => [name, providerState(raw, name)]),
   ) as Record<ProviderName, "real" | "mock" | string[]>;
+  // Only the API key + agent id: phone calls stay simulated, but the
+  // browser "talk to the assistant" demo works.
+  const browserOnly =
+    !!raw.ELEVENLABS_API_KEY &&
+    !!raw.ELEVENLABS_AGENT_ID &&
+    !raw.ELEVENLABS_PHONE_NUMBER_ID &&
+    !raw.ELEVENLABS_WEBHOOK_SECRET;
+  if (browserOnly) states.voice = "mock";
 
   for (const [name, state] of Object.entries(states)) {
     if (Array.isArray(state)) {
@@ -175,6 +198,7 @@ export function parseEnv(source: Record<string, string | undefined>): AppEnv {
     email: states.email === "real" ? "resend" : "mock",
     payments: states.payments === "real" ? "razorpay" : "mock",
     googleAuth: states.googleAuth === "real" ? "enabled" : "disabled",
+    browserVoice: raw.ELEVENLABS_API_KEY && raw.ELEVENLABS_AGENT_ID ? "enabled" : "disabled",
   };
 
   const isDemo =

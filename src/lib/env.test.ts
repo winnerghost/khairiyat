@@ -56,6 +56,7 @@ describe("parseEnv: demo mode", () => {
       email: "mock",
       payments: "mock",
       googleAuth: "disabled",
+      browserVoice: "disabled",
     });
     expect(env.DATA_ENCRYPTION_KEY).toBe(DEMO_ENCRYPTION_KEY);
     expect(env.BETTER_AUTH_SECRET).toBe(DEMO_AUTH_SECRET);
@@ -63,7 +64,13 @@ describe("parseEnv: demo mode", () => {
   });
 
   it("treats empty strings like missing keys", () => {
-    const env = parseEnv({ ELEVENLABS_API_KEY: "", DATABASE_URL: "  " });
+    const env = parseEnv({
+      ELEVENLABS_API_KEY: "",
+      DATABASE_URL: "  ",
+      ELEVENLABS_API_BASE: "",
+      APP_URL: "",
+    });
+    expect(env.ELEVENLABS_API_BASE).toBe("https://api.elevenlabs.io");
     expect(env.modes.voice).toBe("mock");
     expect(env.modes.database).toBe("embedded");
   });
@@ -90,6 +97,19 @@ describe("parseEnv: provider switching", () => {
     expect(problems[0]).toContain("whatsapp is only partly configured");
     expect(problems[0]).toContain("WHATSAPP_APP_SECRET");
     expect(problems[0]).toContain("WHATSAPP_VERIFY_TOKEN");
+  });
+
+  it("allows the browser voice demo with only an API key and agent id", () => {
+    const env = parseEnv({ ELEVENLABS_API_KEY: "k", ELEVENLABS_AGENT_ID: "a" });
+    expect(env.modes.voice).toBe("mock");
+    expect(env.modes.browserVoice).toBe("enabled");
+    expect(() =>
+      parseEnv({
+        ELEVENLABS_API_KEY: "k",
+        ELEVENLABS_AGENT_ID: "a",
+        ELEVENLABS_PHONE_NUMBER_ID: "p",
+      }),
+    ).toThrow(EnvConfigError);
   });
 
   it("parses the admin email list", () => {

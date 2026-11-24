@@ -6,6 +6,9 @@ import { Callout, Card, CardTitle } from "@/components/ui/card";
 import { Field, Select } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { AutoRefresh } from "@/components/auto-refresh";
+import { TalkToAssistant } from "@/components/talk-to-assistant";
+import { assistantNameFor } from "@/config/brand";
+import { getEnv } from "@/lib/env";
 import { jobRuns, parents } from "@/db/schema/app";
 import { SCENARIO_LABELS, SCENARIOS } from "@/providers/voice/mock-scripts";
 import { getTodayStatus } from "@/server/dashboard";
@@ -27,6 +30,7 @@ const ERRORS: Record<string, string> = {
 
 export default async function DemoRoom({ searchParams }: PageProps<"/demo">) {
   const sp = await searchParams;
+  const env = getEnv();
   const { db, family, user } = await requireMember();
   const admin = isAdminEmail(user.email);
   const list = await db
@@ -112,6 +116,25 @@ export default async function DemoRoom({ searchParams }: PageProps<"/demo">) {
             </Field>
             <SubmitButton pendingText="Dialing…">Call now</SubmitButton>
           </form>
+        )}
+      </Card>
+
+      <Card className="flex flex-col gap-3">
+        <CardTitle>Hear the real voice</CardTitle>
+        {env.modes.browserVoice === "enabled" ? (
+          <>
+            <p className="text-base text-muted">
+              Talk to {assistantNameFor("female")} in your browser with the same memory a real call
+              would have (uses your microphone and a few ElevenLabs credits).
+            </p>
+            <TalkToAssistant assistantName={assistantNameFor("female")} />
+          </>
+        ) : (
+          <p className="text-base text-muted">
+            Add <code>ELEVENLABS_API_KEY</code> and <code>ELEVENLABS_AGENT_ID</code> to{" "}
+            <code>.env.local</code> (run <code>npm run agent:sync</code> to create the agent) and
+            restart, to talk to the real voice assistant here.
+          </p>
         )}
       </Card>
 

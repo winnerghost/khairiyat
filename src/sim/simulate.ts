@@ -113,43 +113,37 @@ export async function runSimulation(db: Db, opts: SimulationOptions): Promise<Si
   const pwHash = await hashPassword("simulation-password");
   for (let i = 0; i < opts.parents; i++) {
     const uid = `sim_user_${i}`;
-    await db
-      .insert(user)
-      .values({
-        id: uid,
-        name: `Child ${i}`,
-        email: `child${i}@sim.test`,
-        emailVerified: true,
-        createdAt: before,
-        updatedAt: before,
-      });
-    await db
-      .insert(account)
-      .values({
-        id: `${uid}_c`,
-        accountId: uid,
-        providerId: "credential",
-        userId: uid,
-        password: pwHash,
-        createdAt: before,
-        updatedAt: before,
-      });
+    await db.insert(user).values({
+      id: uid,
+      name: `Child ${i}`,
+      email: `child${i}@sim.test`,
+      emailVerified: true,
+      createdAt: before,
+      updatedAt: before,
+    });
+    await db.insert(account).values({
+      id: `${uid}_c`,
+      accountId: uid,
+      providerId: "credential",
+      userId: uid,
+      password: pwHash,
+      createdAt: before,
+      updatedAt: before,
+    });
     const [fam] = await db
       .insert(families)
       .values({ name: `Sim family ${i}`, createdByUserId: uid, createdAt: before })
       .returning();
     const wa = `+9198${String(70000000 + i)}`;
     if (rand() < 0.08) failingNumbers.add(wa); // WhatsApp keeps failing for these → email fallback
-    await db
-      .insert(familyMembers)
-      .values({
-        familyId: fam!.id,
-        userId: uid,
-        role: "owner",
-        displayName: `Child ${i}`,
-        whatsappE164: wa,
-        createdAt: before,
-      });
+    await db.insert(familyMembers).values({
+      familyId: fam!.id,
+      userId: uid,
+      role: "owner",
+      displayName: `Child ${i}`,
+      whatsappE164: wa,
+      createdAt: before,
+    });
     const tz = ZONES[Math.floor(rand() * ZONES.length)]!;
     // Call times between 08:00 and 19:30, clustered around mornings, some at the edges.
     const minutes =
@@ -176,34 +170,28 @@ export async function runSimulation(db: Db, opts: SimulationOptions): Promise<Si
         updatedAt: before,
       })
       .returning();
-    await db
-      .insert(schedules)
-      .values({
-        parentId: p!.id,
-        callTime: minutesToHHMM(Math.min(minutes, 19 * 60 + 30)),
-        daysOfWeek: [1, 2, 3, 4, 5, 6, 7],
-        updatedAt: before,
-      });
+    await db.insert(schedules).values({
+      parentId: p!.id,
+      callTime: minutesToHHMM(Math.min(minutes, 19 * 60 + 30)),
+      daysOfWeek: [1, 2, 3, 4, 5, 6, 7],
+      updatedAt: before,
+    });
     await db
       .insert(medicines)
       .values({ parentId: p!.id, name: "BP tablet", timing: "morning", withFood: "either" });
-    await db
-      .insert(emergencyContacts)
-      .values({
-        parentId: p!.id,
-        name: "Neighbour",
-        whatsappE164: `+9196${String(70000000 + i)}`,
-        email: `neighbour${i}@sim.test`,
-      });
-    await db
-      .insert(subscriptions)
-      .values({
-        parentId: p!.id,
-        familyId: fam!.id,
-        planId: "standard",
-        status: "active",
-        currentPeriodEnd: new Date(start.getTime() + 40 * 86400_000),
-      });
+    await db.insert(emergencyContacts).values({
+      parentId: p!.id,
+      name: "Neighbour",
+      whatsappE164: `+9196${String(70000000 + i)}`,
+      email: `neighbour${i}@sim.test`,
+    });
+    await db.insert(subscriptions).values({
+      parentId: p!.id,
+      familyId: fam!.id,
+      planId: "standard",
+      status: "active",
+      currentPeriodEnd: new Date(start.getTime() + 40 * 86400_000),
+    });
   }
   log(`created ${opts.parents} families`);
 

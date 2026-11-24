@@ -43,32 +43,28 @@ async function main() {
     await db
       .insert(user)
       .values(batch.map((j) => ({ id: `lt_${j}`, name: `Child ${j}`, email: `lt${j}@load.test` })));
-    await db
-      .insert(account)
-      .values(
-        batch.map((j) => ({
-          id: `lt_${j}_c`,
-          accountId: `lt_${j}`,
-          providerId: "credential",
-          userId: `lt_${j}`,
-          password: hash,
-        })),
-      );
+    await db.insert(account).values(
+      batch.map((j) => ({
+        id: `lt_${j}_c`,
+        accountId: `lt_${j}`,
+        providerId: "credential",
+        userId: `lt_${j}`,
+        password: hash,
+      })),
+    );
     const fams = await db
       .insert(families)
       .values(batch.map((j) => ({ name: `Family ${j}`, createdByUserId: `lt_${j}` })))
       .returning();
-    await db
-      .insert(familyMembers)
-      .values(
-        fams.map((f, k) => ({
-          familyId: f.id,
-          userId: `lt_${batch[k]}`,
-          role: "owner" as const,
-          displayName: "Child",
-          whatsappE164: `+9198${String(10000000 + batch[k]!)}`,
-        })),
-      );
+    await db.insert(familyMembers).values(
+      fams.map((f, k) => ({
+        familyId: f.id,
+        userId: `lt_${batch[k]}`,
+        role: "owner" as const,
+        displayName: "Child",
+        whatsappE164: `+9198${String(10000000 + batch[k]!)}`,
+      })),
+    );
     const ps = await db
       .insert(parents)
       .values(
@@ -86,35 +82,29 @@ async function main() {
         })),
       )
       .returning();
-    await db
-      .insert(schedules)
-      .values(
-        ps.map((p) => ({
-          parentId: p.id,
-          callTime: "09:30",
-          daysOfWeek: [1, 2, 3, 4, 5, 6, 7],
-          updatedAt: before,
-        })),
-      );
-    await db
-      .insert(emergencyContacts)
-      .values(
-        ps.map((p, k) => ({
-          parentId: p.id,
-          name: "N",
-          whatsappE164: `+9196${String(10000000 + batch[k]!)}`,
-        })),
-      );
-    await db
-      .insert(subscriptions)
-      .values(
-        ps.map((p) => ({
-          parentId: p.id,
-          familyId: p.familyId,
-          planId: "standard",
-          status: "active" as const,
-        })),
-      );
+    await db.insert(schedules).values(
+      ps.map((p) => ({
+        parentId: p.id,
+        callTime: "09:30",
+        daysOfWeek: [1, 2, 3, 4, 5, 6, 7],
+        updatedAt: before,
+      })),
+    );
+    await db.insert(emergencyContacts).values(
+      ps.map((p, k) => ({
+        parentId: p.id,
+        name: "N",
+        whatsappE164: `+9196${String(10000000 + batch[k]!)}`,
+      })),
+    );
+    await db.insert(subscriptions).values(
+      ps.map((p) => ({
+        parentId: p.id,
+        familyId: p.familyId,
+        planId: "standard",
+        status: "active" as const,
+      })),
+    );
   }
   await db.insert(appSettings).values({ key: "concurrency_limit", value: concurrency });
 

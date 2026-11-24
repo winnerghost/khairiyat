@@ -7,6 +7,7 @@ import { systemClock, type Clock } from "@/engine/clock";
 import { getEnv } from "@/lib/env";
 import { createMockEmailProvider } from "@/providers/email/mock";
 import { createMockVoiceProvider } from "@/providers/voice/mock";
+import { createElevenLabsProvider, type ElevenLabsConfig } from "@/providers/voice/elevenlabs";
 import type { VoiceProvider } from "@/providers/voice/types";
 import type { EmailProvider } from "@/providers/email/types";
 import { createMockWhatsAppProvider } from "@/providers/whatsapp/mock";
@@ -42,5 +43,19 @@ export function getVoiceProvider(db: Db, clock: Clock = systemClock): VoiceProvi
       seed: Date.now() % 100000,
     });
   }
-  throw new ProviderNotBuiltError("ElevenLabs provider not wired yet.");
+  return createElevenLabsProvider(elevenLabsConfig());
+}
+
+export function elevenLabsConfig(): ElevenLabsConfig {
+  const env = getEnv();
+  return {
+    apiKey: env.ELEVENLABS_API_KEY!,
+    agentId: env.ELEVENLABS_AGENT_ID!,
+    phoneNumberId: env.ELEVENLABS_PHONE_NUMBER_ID ?? "",
+    webhookSecret: env.ELEVENLABS_WEBHOOK_SECRET ?? "",
+    telephony: env.ELEVENLABS_TELEPHONY,
+    apiBase: env.ELEVENLABS_API_BASE,
+    voiceIdFemale: env.ELEVENLABS_VOICE_ID_FEMALE,
+    voiceIdMale: env.ELEVENLABS_VOICE_ID_MALE,
+  };
 }
