@@ -38,6 +38,6 @@ export const FAQ_EN = [
   },
   {
     q: "Who can see the conversations?",
-    a: "Only family members you add, and our small team when fixing a problem. Data is stored in India, health notes are encrypted, and you can download or delete everything anytime.",
+    a: "Only family members you add, and our small team when fixing a problem. Calls are handled by our voice partner (ElevenLabs). Health notes are encrypted, transcripts are deleted after 180 days by default, and you can download or delete everything anytime.",
   },
 ] as const;

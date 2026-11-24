@@ -1,19 +1,17 @@
+import type { Metadata } from "next";
+import { Landing } from "@/components/marketing/landing";
 import { brand } from "@/config/brand";
 
-/**
- * Temporary home page (Phase 0). The real landing page is built in Phase 7.
- */
+// Prices come from the database (editable in admin), so render per request.
+export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: { absolute: `${brand.name}: daily check-in calls for your parents` },
+  description:
+    "A warm AI assistant calls your parent every day in Hindi, Urdu, Hinglish or English, and sends you a gentle WhatsApp note. Alerts if they can't be reached. Not an emergency service.",
+  alternates: { canonical: "/", languages: { "en-IN": "/", "hi-IN": "/hi" } },
+};
+
 export default function Home() {
-  return (
-    <main className="mx-auto flex w-full max-w-xl flex-1 flex-col justify-center gap-6 px-4 py-16">
-      <p className="text-sm font-semibold tracking-wide text-primary uppercase">{brand.name}</p>
-      <h1 className="font-heading text-4xl leading-tight text-foreground">{brand.tagline}</h1>
-      <p className="text-lg text-muted">{brand.taglineEn}</p>
-      <p className="rounded-xl border border-accent/40 bg-surface p-4 text-base">
-        We are building this carefully. {brand.assistantNames.female} will call your parent every
-        day, ask how they are, and send you a short, gentle note. It is not a medical or emergency
-        service.
-      </p>
-    </main>
-  );
+  return <Landing lang="en" />;
 }

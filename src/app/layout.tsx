@@ -19,6 +19,15 @@ const headingFont = Fraunces({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.APP_URL || "http://localhost:3000"),
+  openGraph: {
+    type: "website",
+    siteName: brand.name,
+    locale: "en_IN",
+    title: `${brand.name}: daily check-in calls for your parents`,
+    description: brand.taglineEn,
+  },
+  twitter: { card: "summary_large_image" },
   title: {
     default: `${brand.name} · ${brand.tagline}`,
     template: `%s · ${brand.name}`,
