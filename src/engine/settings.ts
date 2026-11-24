@@ -44,6 +44,16 @@ export const settingsSchema = z.object({
       telephonyPerMinInr: 1.0,
       whatsappPerMessageInr: 0.145,
     }),
+  /** GST-ready invoices: off until the business is GST-registered. */
+  gst: z
+    .object({
+      enabled: z.boolean(),
+      gstin: z.string().max(20),
+      ratePercent: z.number().min(0).max(28),
+      legalName: z.string().max(120),
+      address: z.string().max(300),
+    })
+    .default({ enabled: false, gstin: "", ratePercent: 18, legalName: "", address: "" }),
   feature_flags: z
     .object({
       weeklyDigest: z.boolean(),

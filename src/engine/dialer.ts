@@ -9,6 +9,7 @@
 import { and, asc, count, eq, gt, inArray, lte } from "drizzle-orm";
 import { callAttempts, checkIns, parents, subscriptions } from "@/db/schema/app";
 import { dbErrorMessage, isGuardViolation } from "@/db/errors";
+import type { DbOrTx } from "@/db/types";
 import { isWithinCallWindow } from "@/lib/time";
 import type { EngineDeps } from "./deps";
 import { billingAllowsCalls, slotForParent } from "./eligibility";
@@ -25,9 +26,9 @@ export interface DialStats {
 }
 
 /** Calls currently ringing or talking (ignoring very old stuck ones, which reconciliation handles). */
-export async function activeCallCount(deps: EngineDeps): Promise<number> {
-  const since = new Date(deps.clock.now().getTime() - 30 * 60_000);
-  const [row] = await deps.db
+export async function activeCallCount(db: DbOrTx, now: Date): Promise<number> {
+  const since = new Date(now.getTime() - 30 * 60_000);
+  const [row] = await db
     .select({ n: count() })
     .from(callAttempts)
     .where(
@@ -43,7 +44,7 @@ export async function dialDue(deps: EngineDeps, settings: Settings): Promise<Dia
   const stats: DialStats = { dialed: 0, startFailed: 0, cancelled: 0, capacityLeft: 0 };
   if (!settings.calls_enabled) return stats;
   const now = deps.clock.now();
-  const capacity = settings.concurrency_limit - (await activeCallCount(deps));
+  const capacity = settings.concurrency_limit - (await activeCallCount(deps.db, now));
   if (capacity <= 0) return stats;
 
   type Claimed = {

@@ -287,6 +287,11 @@ export async function dispatchDue(
 /** When WhatsApp gives up (or is struggling with an urgent alert), send the same words by email. */
 async function enqueueEmailFallback(deps: EngineDeps, n: Row, now: Date): Promise<void> {
   if (n.channel !== "whatsapp") return;
+  // Admins may switch off fallback for ordinary messages; urgent alerts always fall back.
+  if (n.priority !== "urgent") {
+    const { getSettings } = await import("./settings");
+    if (!(await getSettings(deps.db)).feature_flags.emailFallback) return;
+  }
   let email: string | null = null;
   if (n.recipientMemberId) {
     const [r] = await deps.db

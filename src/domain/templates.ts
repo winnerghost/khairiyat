@@ -21,11 +21,16 @@ export type TemplateName =
   | "payment_issue"
   | "weekly_digest"
   | "daily_digest"
-  | "call_problem";
+  | "call_problem"
+  | "billing_notice";
 
 export type Lang = "en" | "hi";
 
 export const TEMPLATES: Record<TemplateName, Record<Lang, string>> = {
+  billing_notice: {
+    en: "{{1}}\n{{2}}",
+    hi: "{{1}}\n{{2}}",
+  },
   daily_summary: {
     en: "🌼 Today's call with {{1}}\nSpoke at {{2}}.\n\n{{3}}\n\nFull call: {{4}}",
     hi: "🌼 आज {{1}} से बात हुई\nसमय: {{2}}\n\n{{3}}\n\nपूरी बातचीत: {{4}}",
@@ -86,6 +91,10 @@ export const TEMPLATE_SUBJECTS: Record<TemplateName, Record<Lang, string>> = {
   payment_issue: {
     en: `${brand.name}: payment didn't go through`,
     hi: `${brand.nameHi}: भुगतान नहीं हो पाया`,
+  },
+  billing_notice: {
+    en: `${brand.name}: about your plan`,
+    hi: `${brand.nameHi}: आपके प्लान के बारे में`,
   },
   weekly_digest: {
     en: `${brand.name}: this week with {{1}}`,

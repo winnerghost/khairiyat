@@ -236,7 +236,7 @@ export async function runSimulation(db: Db, opts: SimulationOptions): Promise<Si
   const { ticks } = await fastForward(deps, clock, end, {
     maxStepMinutes: 10,
     onTick: async () => {
-      const n = await activeCallCount(deps);
+      const n = await activeCallCount(deps.db, clock.now());
       maxConcurrent = Math.max(maxConcurrent, n);
       if (n > DEFAULT_SETTINGS.concurrency_limit)
         violations.push(`concurrency exceeded: ${n} calls at ${clock.now().toISOString()}`);

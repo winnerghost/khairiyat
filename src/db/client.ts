@@ -3,12 +3,15 @@
  *
  * - DATABASE_URL set   → real Postgres (Supabase in production)
  * - DATABASE_URL empty → PGlite: real Postgres running inside Node, stored in
- *                        .demo-data/pglite (or in memory with PGLITE_DATA_DIR=memory://)
+ *                        ~/.khairiyat/demo-data (or in memory with PGLITE_DATA_DIR=memory://).
+ *                        It lives outside the project folder on purpose: the dev
+ *                        server watches the project and would reload on every write.
  *
  * Migrations in drizzle/ run automatically on first use. The call engine
  * never imports this file: it receives a `Db` so it can also run on Deno.
  */
 import { mkdirSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
@@ -35,6 +38,7 @@ export interface OpenDbOptions {
 }
 
 const MIGRATIONS_FOLDER = path.join(process.cwd(), "drizzle");
+export const DEFAULT_PGLITE_DIR = path.join(os.homedir(), ".khairiyat", "demo-data");
 
 export async function openDb(options: OpenDbOptions = {}): Promise<DbHandle> {
   const shouldMigrate = options.migrate ?? true;
@@ -54,7 +58,7 @@ export async function openDb(options: OpenDbOptions = {}): Promise<DbHandle> {
     return { db: db as unknown as Db, kind: "postgres", close: () => client.end() };
   }
 
-  const dataDir = options.pgliteDataDir ?? path.join(process.cwd(), ".demo-data", "pglite");
+  const dataDir = options.pgliteDataDir ?? DEFAULT_PGLITE_DIR;
   if (!dataDir.startsWith("memory://")) mkdirSync(dataDir, { recursive: true });
   const client = new PGlite(dataDir);
   const db = drizzlePglite(client, { schema });

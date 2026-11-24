@@ -7,6 +7,7 @@
 import { jobRuns } from "@/db/schema/app";
 import { eq } from "drizzle-orm";
 import type { EngineDeps } from "./deps";
+import { processBillingTransitions } from "./billing";
 import { dialDue } from "./dialer";
 import { purgeOldTranscripts, sendDigests } from "./digests";
 import { acquireLease, releaseLease } from "./lease";
@@ -27,6 +28,7 @@ export interface TickStats {
   dial?: { dialed: number; startFailed: number; cancelled: number; capacityLeft: number };
   notifications?: { sent: number; failed: number; dead: number };
   digests?: { daily: number; weekly: number };
+  billingChanges?: number;
   purged?: number;
   durationMs?: number;
   error?: string;
@@ -60,6 +62,7 @@ export async function runTick(
       }, deps.clock.now());
     }
     stats.resumed = await autoResumePaused(deps);
+    stats.billingChanges = await processBillingTransitions(deps, settings);
     const m = await materializeDueCheckIns(deps, settings);
     stats.created = m.created;
     stats.missed = m.missed;
