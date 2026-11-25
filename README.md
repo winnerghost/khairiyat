@@ -61,7 +61,7 @@ Calls only happen between **8 am and 8 pm in the parent's time zone**, even in t
 | ------------------------------------ | ------------------------------------------------------------------------------------------ |
 | `npm run demo`                       | Start the app in demo mode                                                                 |
 | `npm run seed`                       | Rebuild demo data (`npm run seed -- 7` for 7 days)                                         |
-| `npm test`                           | 141 unit + integration tests (about a minute)                                              |
+| `npm test`                           | 144 unit + integration tests (about a minute)                                              |
 | `npm run test:pg`                    | The integration tests on a real Postgres (set `TEST_DATABASE_URL`)                         |
 | `npm run e2e`                        | Browser tests on a 390px phone and on desktop (full family journey)                        |
 | `npm run simulate:week`              | 50 pretend parents × 7 pretend days with outages and lost messages; checks every hard rule |

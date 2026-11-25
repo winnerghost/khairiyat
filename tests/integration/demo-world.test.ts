@@ -4,11 +4,17 @@
  * complete, consistent demo, and every hard rule must still hold.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { count, sql } from "drizzle-orm";
-import { checkIns, families, parents } from "@/db/schema/app";
+import { count, eq, sql } from "drizzle-orm";
+import { appSettings, checkIns, families, parents } from "@/db/schema/app";
 import { user } from "@/db/schema/auth";
 import type { DbHandle } from "@/db/client";
-import { continueDemoWorld, demoWorldNeed, startDemoWorld } from "@/sim/demo-data";
+import { acquireLease, releaseLease } from "@/engine/lease";
+import {
+  continueDemoWorld,
+  DEMO_WORLD_LEASE,
+  demoWorldNeed,
+  startDemoWorld,
+} from "@/sim/demo-data";
 import { createTestDb } from "../helpers/db";
 import { TEST_KEY } from "../helpers/engine";
 
@@ -92,5 +98,43 @@ describe("hosted demo: the demo world in steps", () => {
       JOIN parents p ON p.id = c.parent_id
       WHERE extract(hour FROM a.dialed_at AT TIME ZONE p.timezone) NOT BETWEEN 8 AND 19`);
     expect(Array.from(late as unknown as unknown[]).length).toBe(0);
+  });
+});
+
+describe("hosted demo: two visitors at the same moment", () => {
+  let handle: DbHandle;
+  beforeAll(async () => {
+    handle = await createTestDb();
+  });
+  afterAll(async () => {
+    await handle.close();
+  });
+
+  it("keeps the demo lease through a wipe, so no one else starts building meanwhile", async () => {
+    const t = new Date();
+    expect(await acquireLease(handle.db, DEMO_WORLD_LEASE, "first-visitor", t, 45)).toBe(true);
+    await startDemoWorld(handle.db, { ...opts, now: NOW, days: 2 });
+    expect(await acquireLease(handle.db, DEMO_WORLD_LEASE, "second-visitor", t, 45)).toBe(false);
+    await releaseLease(handle.db, DEMO_WORLD_LEASE, "first-visitor");
+  });
+
+  it("never asks for a normal tick while the families are being created", async () => {
+    // A creation that stopped half-way (e.g. the function was stopped).
+    await handle.db
+      .update(appSettings)
+      .set({ value: sql`jsonb_set(value, '{created}', 'false')` })
+      .where(eq(appSettings.key, "demo_world"));
+    expect(await demoWorldNeed(handle.db, NOW, 4000)).toEqual({ need: "start" });
+    await expect(continueDemoWorld(handle.db, { ...opts, now: NOW })).rejects.toThrow(
+      "still being created",
+    );
+  });
+
+  it("starts over cleanly after an interrupted creation", async () => {
+    await startDemoWorld(handle.db, { ...opts, now: NOW, days: 2 });
+    const p = await continueDemoWorld(handle.db, { ...opts, now: NOW });
+    expect(p).toMatchObject({ kind: "seed", done: true });
+    const [fams] = await handle.db.select({ n: count() }).from(families);
+    expect(fams!.n).toBe(6);
   });
 });

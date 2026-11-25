@@ -6,13 +6,14 @@
  * Node-only. Never runs in production.
  */
 import { hashPassword } from "better-auth/crypto";
-import { and, desc, eq, lt, sql } from "drizzle-orm";
+import { and, desc, eq, lt, ne, sql } from "drizzle-orm";
 import { DEFAULT_PLANS } from "@/config/defaults";
 import { ensureReferenceData } from "@/db/bootstrap";
 import {
   alerts,
   appSettings,
   emergencyContacts,
+  engineLeases,
   familyMembers,
   familyNotes,
   families,
@@ -48,13 +49,21 @@ const TABLES_TO_WIPE = [
   "webhook_events",
   "mock_messages",
   "mock_calls",
-  "engine_leases",
   "rate_limits",
   "verifications",
 ];
 
+/**
+ * The hosted demo's "only one request builds the demo" lease. A wipe keeps
+ * it: whoever is wiping holds it, and dropping it would let another request
+ * tick the real engine in the middle of the rebuild.
+ */
+export const DEMO_WORLD_LEASE = "demo-world";
+
 export async function wipeDemoData(db: Db): Promise<void> {
   await db.execute(sql.raw(`TRUNCATE ${TABLES_TO_WIPE.map((t) => `"${t}"`).join(", ")} CASCADE`));
+  // The engine's own leases go: the history is replayed with a clock in the past.
+  await db.delete(engineLeases).where(ne(engineLeases.name, DEMO_WORLD_LEASE));
   await ensureReferenceData(db);
 }
 
@@ -398,6 +407,11 @@ interface DemoWorldMarker {
   start: string;
   /** "Now" when the demo was created: planned scenarios count days back from it. */
   anchor: string;
+  /**
+   * False while the families are being created (an interrupted creation
+   * starts over). Missing in markers written before this field existed.
+   */
+  created?: boolean;
   done: boolean;
   /** parentId → local date → forced scenario (the fall yesterday, the opt-out…). */
   plans: Record<string, Record<string, Scenario>>;
@@ -442,6 +456,15 @@ export async function startDemoWorld(
   await wipeDemoData(db);
   const start = new Date(opts.now.getTime() - maxDays * 24 * 3600_000);
   const DAY = 24 * 3600_000;
+  // First thing after the wipe: from now on everyone sees "being built".
+  await writeMarker(db, {
+    start: start.toISOString(),
+    anchor: opts.now.toISOString(),
+    created: false,
+    done: false,
+    plans: {},
+    styles: {},
+  });
 
   const plans: Record<string, Record<string, Scenario>> = {}; // parentId → localDate → scenario
   const styles: Record<string, Scenario[]> = {};
@@ -619,6 +642,7 @@ export async function startDemoWorld(
   await writeMarker(db, {
     start: start.toISOString(),
     anchor: opts.now.toISOString(),
+    created: true,
     done: false,
     plans,
     styles,
@@ -648,6 +672,9 @@ export async function continueDemoWorld(
   opts: DemoOptions & { budgetMs?: number },
 ): Promise<DemoProgress> {
   const marker = await readMarker(db);
+  if (marker?.created === false) {
+    throw new Error("The demo families are still being created: call startDemoWorld() first.");
+  }
   if (marker && !marker.done) return continueSeed(db, marker, opts);
   const r = await catchUpDemo(db, opts);
   if (!r) return { kind: "none", done: true, ticks: 0, progress: 1, minutesLeft: 0 };
@@ -813,8 +840,9 @@ export async function demoWorldNeed(
   now: Date,
   tickEveryMs: number,
 ): Promise<DemoWorldNeed> {
-  if (!(await hasAnyUsers(db))) return { need: "start" };
   const marker = await readMarker(db);
+  // No demo yet, or a creation that was interrupted (it starts over).
+  if (marker?.created === false || !(await hasAnyUsers(db))) return { need: "start" };
   const last = await lastTickAt(db);
   const minutesLeft = (from: number) => Math.round((now.getTime() - from) / 60_000);
   if (marker && !marker.done) {

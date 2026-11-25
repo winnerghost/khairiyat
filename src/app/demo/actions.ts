@@ -11,7 +11,8 @@ import { SCENARIOS, type Scenario } from "@/providers/voice/mock-scripts";
 import { pauseLocalTicker, resumeLocalTicker, tickOnce } from "@/server/engine-runner";
 import { getParent } from "@/server/parents";
 import { isAdminEmail, requireMember } from "@/server/session";
-import { seedDemo, startDemoWorld } from "@/sim/demo-data";
+import { resetDemoWorld } from "@/server/demo-world";
+import { seedDemo } from "@/sim/demo-data";
 
 function demoOnly() {
   const env = getEnv();
@@ -50,19 +51,21 @@ export async function demoTickAction() {
 export async function demoResetAction() {
   const env = demoOnly();
   await requireMember();
+  // Public demo website: only recreate the families here (under the demo
+  // lease); the history is then built in short steps on the next page loads.
+  if (env.isHostedDemo) {
+    if (!(await resetDemoWorld())) redirect("/demo?error=busy");
+    redirect("/login?demo=reset");
+  }
   pauseLocalTicker();
   try {
     const { getDb } = await import("@/db/client");
-    const opts = {
+    await seedDemo(await getDb(), {
       now: new Date(),
       days: 21,
       encryptionKey: env.DATA_ENCRYPTION_KEY,
       appUrl: env.APP_URL,
-    };
-    // Public demo website: only recreate the families here; the history is
-    // then built in short steps on the next page loads (progress screen).
-    if (env.isHostedDemo) await startDemoWorld(await getDb(), opts);
-    else await seedDemo(await getDb(), opts);
+    });
   } finally {
     resumeLocalTicker();
   }

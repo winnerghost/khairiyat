@@ -26,6 +26,7 @@ const ERRORS: Record<string, string> = {
   calls_disabled: "Calls are switched off in Admin → Settings.",
   limit_reached: "Max 3 extra calls per day for this parent.",
   call_in_progress: "A call for this parent is already in progress. Wait a few seconds.",
+  busy: "The demo is being rebuilt right now. Try again in a minute.",
 };
 
 export default async function DemoRoom({ searchParams }: PageProps<"/demo">) {

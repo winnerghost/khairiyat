@@ -28,6 +28,7 @@ import { getEnv } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import {
   continueDemoWorld,
+  DEMO_WORLD_LEASE,
   demoWorldNeed,
   startDemoWorld,
   type DemoWorldNeed,
@@ -38,7 +39,7 @@ export type DemoWorldStatus =
   | { state: "ready" }
   | { state: "preparing"; kind: "seed" | "catch_up"; progress: number; minutesLeft: number };
 
-const LEASE = "demo-world";
+const LEASE = DEMO_WORLD_LEASE;
 const LEASE_SECS = 45;
 /** Engine time per request while preparing. Netlify functions stop at 60 s. */
 const STEP_BUDGET_MS = 8_000;
@@ -83,7 +84,11 @@ async function step({ background }: { background: boolean }): Promise<DemoWorldS
     }
     try {
       const opts = { encryptionKey: env.DATA_ENCRYPTION_KEY, appUrl: env.APP_URL };
-      if (need.need === "start") {
+      // Look again now that we hold the lease: another request may have
+      // just finished (two first visitors must not both create the demo).
+      const fresh = await demoWorldNeed(db, new Date(), TICK_EVERY_MS);
+      if (fresh.need === "nothing" || fresh.need === "tick") return READY;
+      if (fresh.need === "start") {
         const days = Number(process.env.DEMO_SEED_DAYS ?? 21);
         await startDemoWorld(db, { ...opts, now: new Date(), days });
         logger.info("demo world: created the demo families", { days });
@@ -106,6 +111,30 @@ async function step({ background }: { background: boolean }): Promise<DemoWorldS
   } catch (error) {
     logger.error("demo world: could not move forward", { error });
     return READY; // show the page anyway; the next visit tries again
+  }
+}
+
+/**
+ * "Reset all demo data" on the public demo: recreate the families under the
+ * lease (the history is then built by the next page loads). Returns false
+ * if the demo is being built right now.
+ */
+export async function resetDemoWorld(): Promise<boolean> {
+  const env = getEnv();
+  const db = await getDb();
+  const holder = randomToken(9);
+  if (!(await acquireLease(db, LEASE, holder, new Date(), LEASE_SECS))) return false;
+  try {
+    const days = Number(process.env.DEMO_SEED_DAYS ?? 21);
+    await startDemoWorld(db, {
+      now: new Date(),
+      days,
+      encryptionKey: env.DATA_ENCRYPTION_KEY,
+      appUrl: env.APP_URL,
+    });
+    return true;
+  } finally {
+    await releaseLease(db, LEASE, holder);
   }
 }
 
