@@ -6,3 +6,9 @@
 [build]
   command = "npm run build"
   publish = ".next"
+
+# Netlify adds this runtime by itself for sites linked to Git, but not always
+# for sites created through the API: without it only static pages are
+# published. Not pinned: Netlify keeps it up to date.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
