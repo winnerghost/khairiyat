@@ -53,3 +53,5 @@ next-env.d.ts
 
 # Netlify CLI local state
 .netlify
+# Netlify deploy tool's temporary upload archives
+/deploy-*.zip
