@@ -34,7 +34,7 @@ export default async function AdminToday() {
           .
         </Callout>
       )}
-      {tickAge !== null && tickAge > 180 && (
+      {tickAge !== null && tickAge > 180 && !env.isHostedDemo && (
         <Callout tone="danger" title="Scheduler looks stopped">
           Last tick was {Math.round(tickAge / 60)} minutes ago. See docs/RUNBOOK.md §1.
         </Callout>
@@ -69,6 +69,8 @@ export default async function AdminToday() {
             Scheduler:{" "}
             {tickAge === null ? (
               "never ran"
+            ) : env.isHostedDemo ? (
+              `last tick ${tickAge}s ago (public demo: it runs when someone opens a page)`
             ) : tickAge > 180 ? (
               <span className="font-semibold text-danger">
                 STALE: last tick {Math.round(tickAge / 60)} min ago

@@ -1,6 +1,6 @@
 # Go-live checklist
 
-**Nothing in this file is needed for the demo.** The demo runs on your laptop with no accounts (see the README). Use this list only when you decide to serve real families.
+**Nothing in this file is needed for the demo.** The demo runs on your laptop with no accounts, and online at https://khairiyat-demo.netlify.app (see the README). Use this list only when you decide to serve real families.
 
 Items are in the order to start them, **slow ones first** (approvals can take weeks). Facts marked **(verify)** come from research on 24 Nov 2026; re-check them with the provider.
 
@@ -58,7 +58,8 @@ To do:
 ## D. Hosting (free tiers)
 
 - [ ] **Supabase**: project in **Mumbai (ap-south-1)** (region can't change later). Copy the pooler connection string (transaction mode, port 6543) → `DATABASE_URL`. Migrations run automatically on first start.
-- [ ] **Netlify**: new site from the GitHub repo; set all env vars; `APP_ENV=production`, `APP_URL=https://YOUR-DOMAIN`. Re-read Netlify's agreement to confirm the free plan allows commercial use.
+- [ ] **Netlify**: a **new** site from the GitHub repo (keep `khairiyat-demo` as the demo); set all env vars; `APP_ENV=production`, `APP_URL=https://YOUR-DOMAIN`. Re-read Netlify's agreement to confirm the free plan allows commercial use.
+- [ ] The repo includes `@netlify/database`, so a Netlify site also gets a Netlify Database. With Supabase, set `DATABASE_URL` (it takes priority) and the Netlify one stays unused. Netlify's free plan is **300 credits a month shared by all sites on the team**, and running out pauses all of them: keep production on its own team or a paid plan.
 - [ ] Secrets: `DATA_ENCRYPTION_KEY` (`openssl rand -base64 32`, keep an offline copy: losing it loses health notes), `BETTER_AUTH_SECRET`, `CRON_SECRET`, `ADMIN_EMAILS`
 - [ ] Scheduler: run `supabase/sql/cron.sql` in the Supabase SQL editor (pg_cron → `/api/cron/tick` every minute)
 - [ ] Monitoring: Healthchecks.io check (period 1 min, grace 3 min) → `HEALTHCHECKS_PING_URL`; an uptime monitor on `/api/health` (returns 503 if the scheduler stalls)

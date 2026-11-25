@@ -50,3 +50,6 @@ next-env.d.ts
 
 # but DO commit the example env file
 !.env.example
+
+# Netlify CLI local state
+.netlify

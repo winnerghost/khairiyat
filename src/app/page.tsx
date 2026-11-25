@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Landing } from "@/components/marketing/landing";
 import { brand } from "@/config/brand";
+import { warmDemoWorld } from "@/server/demo-world";
 
 // Prices come from the database (editable in admin), so render per request.
 export const dynamic = "force-dynamic";
@@ -12,6 +13,8 @@ export const metadata: Metadata = {
   alternates: { canonical: "/", languages: { "en-IN": "/", "hi-IN": "/hi" } },
 };
 
-export default function Home() {
+export default async function Home() {
+  // Public demo website: start building the demo in the background.
+  await warmDemoWorld();
   return <Landing lang="en" />;
 }

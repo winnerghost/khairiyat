@@ -16,7 +16,7 @@
     "e2e": "playwright test",
     "check": "npm run lint && npm run typecheck && npm run format:check && npm test",
     "seed": "tsx --env-file-if-exists=.env.local scripts/seed.ts",
-    "db:generate": "drizzle-kit generate",
+    "db:generate": "drizzle-kit generate && tsx scripts/sync-netlify-migrations.ts",
     "test:pg": "vitest run tests/integration",
     "simulate:week": "tsx scripts/simulate-week.ts",
     "loadtest:tick": "tsx scripts/loadtest-tick.ts",
@@ -26,6 +26,7 @@
   "dependencies": {
     "@electric-sql/pglite": "^0.6.0",
     "@elevenlabs/client": "^1.38.0",
+    "@netlify/database": "^2.0.3",
     "better-auth": "^1.7.28",
     "drizzle-orm": "^0.45.4",
     "libphonenumber-js": "^1.13.17",

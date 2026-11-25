@@ -2,12 +2,22 @@ import Link from "next/link";
 import { logoutAction } from "@/app/(auth)/actions";
 import { brand } from "@/config/brand";
 
-export function AppHeader({ isAdmin, demo }: { isAdmin: boolean; demo: boolean }) {
+export function AppHeader({
+  isAdmin,
+  demo,
+  publicDemo = false,
+}: {
+  isAdmin: boolean;
+  demo: boolean;
+  /** The public demo website: anyone can see demo data. */
+  publicDemo?: boolean;
+}) {
   return (
     <>
       {demo && (
         <div className="bg-accent/25 px-4 py-2 text-center text-sm">
           Demo mode: calls, WhatsApp and payments are simulated.{" "}
+          {publicDemo && "Public demo: please don't enter real names or numbers. "}
           <Link href="/demo" className="font-semibold underline">
             Open the demo control room
           </Link>

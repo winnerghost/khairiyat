@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Landing } from "@/components/marketing/landing";
 import { brand } from "@/config/brand";
+import { warmDemoWorld } from "@/server/demo-world";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,7 @@ export const metadata: Metadata = {
   openGraph: { locale: "hi_IN" },
 };
 
-export default function HindiHome() {
+export default async function HindiHome() {
+  await warmDemoWorld();
   return <Landing lang="hi" />;
 }

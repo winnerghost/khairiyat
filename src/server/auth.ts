@@ -18,7 +18,8 @@ import { getEmailProvider } from "./providers";
 
 function buildAuth(db: Db) {
   const env = getEnv();
-  const isProd = env.APP_ENV === "production";
+  // Production and the public demo website: secure cookies, rate limits, no localhost.
+  const isProd = env.isPublicSite;
   const devOrigins = isProd
     ? []
     : [

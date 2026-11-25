@@ -9,8 +9,11 @@
  *   A half-configured WhatsApp must never silently fall back to a mock,
  *   because that would drop real alerts.
  * - In production we also refuse to start with demo secrets or mock
- *   providers (unless ALLOW_DEMO_PROVIDERS_IN_PRODUCTION=true, for a
- *   public demo site).
+ *   providers (unless ALLOW_DEMO_PROVIDERS_IN_PRODUCTION=true).
+ * - APP_ENV=demo is the PUBLIC DEMO WEBSITE (e.g. on Netlify): demo logins
+ *   and the demo room work, every provider must be the mock (a public demo
+ *   must never call or message a real person), and it needs real secrets,
+ *   https and a shared database, like production.
  *
  * This module has no Node-only imports so the call engine can use it on
  * Supabase Edge Functions (Deno) too: pass `Deno.env.toObject()` to parseEnv.
@@ -35,12 +38,20 @@ const booleanFlag = z
   .transform((v) => v === "true" || v === "1");
 
 const rawSchema = z.object({
-  APP_ENV: z.enum(["development", "test", "production"]).default("development"),
+  /** development / test: your laptop and CI. demo: the public demo website. production: real families. */
+  APP_ENV: z.enum(["development", "test", "demo", "production"]).default("development"),
   APP_URL: z.url().default("http://localhost:3000"),
   ALLOW_DEMO_PROVIDERS_IN_PRODUCTION: booleanFlag,
 
   // Database (empty = embedded demo database)
   DATABASE_URL: optionalString,
+  /**
+   * Set by Netlify itself when the site has a Netlify Database
+   * (https://docs.netlify.com/build/data-and-storage/netlify-database/).
+   * Used when DATABASE_URL is empty. Its migrations are applied by Netlify
+   * on deploy from netlify/database/migrations, not by the app.
+   */
+  NETLIFY_DB_URL: optionalString,
 
   // Secrets for our own app
   DATA_ENCRYPTION_KEY: optionalString,
@@ -123,13 +134,17 @@ export interface ProviderModes {
 }
 
 export interface AppEnv extends RawEnv {
-  /** Secrets with demo fallbacks resolved (demo values only outside production). */
+  /** Secrets with demo fallbacks resolved (demo values only on a laptop / in CI). */
   DATA_ENCRYPTION_KEY: string;
   BETTER_AUTH_SECRET: string;
   CRON_SECRET: string;
   modes: ProviderModes;
   /** True when any provider (or the database) is running as a demo/mock. */
   isDemo: boolean;
+  /** The public demo website (APP_ENV=demo): no background scheduler, the demo moves on visits. */
+  isHostedDemo: boolean;
+  /** Reachable by the public (demo or production): secure cookies, rate limits, no localhost origins. */
+  isPublicSite: boolean;
   adminEmails: string[];
 }
 
@@ -169,6 +184,7 @@ export function parseEnv(source: Record<string, string | undefined>): AppEnv {
   const raw = parsed.data;
   const problems: string[] = [];
   const isProd = raw.APP_ENV === "production";
+  const isHostedDemo = raw.APP_ENV === "demo";
 
   const states = Object.fromEntries(
     (Object.keys(PROVIDER_KEYS) as ProviderName[]).map((name) => [name, providerState(raw, name)]),
@@ -192,7 +208,7 @@ export function parseEnv(source: Record<string, string | undefined>): AppEnv {
   }
 
   const modes: ProviderModes = {
-    database: raw.DATABASE_URL ? "postgres" : "embedded",
+    database: raw.DATABASE_URL || raw.NETLIFY_DB_URL ? "postgres" : "embedded",
     voice: states.voice === "real" ? "elevenlabs" : "mock",
     whatsapp: states.whatsapp === "real" ? "meta" : "mock",
     email: states.email === "real" ? "resend" : "mock",
@@ -208,10 +224,16 @@ export function parseEnv(source: Record<string, string | undefined>): AppEnv {
     modes.email === "mock" ||
     modes.payments === "mock";
 
-  if (isProd) {
-    if (!raw.DATABASE_URL) problems.push("DATABASE_URL is required in production.");
+  if (isProd || isHostedDemo) {
+    const where = isProd ? "production" : "the public demo (APP_ENV=demo)";
+    if (!raw.DATABASE_URL && !raw.NETLIFY_DB_URL) {
+      problems.push(
+        `DATABASE_URL (or a Netlify Database) is required in ${where}: ` +
+          `the embedded database can't be shared between server instances.`,
+      );
+    }
     for (const key of ["DATA_ENCRYPTION_KEY", "BETTER_AUTH_SECRET", "CRON_SECRET"] as const) {
-      if (!raw[key]) problems.push(`${key} is required in production.`);
+      if (!raw[key]) problems.push(`${key} is required in ${where}.`);
     }
     if (raw.DATA_ENCRYPTION_KEY === DEMO_ENCRYPTION_KEY) {
       problems.push("DATA_ENCRYPTION_KEY is the public demo key. Generate a real one.");
@@ -223,16 +245,36 @@ export function parseEnv(source: Record<string, string | undefined>): AppEnv {
       problems.push("CRON_SECRET is the public demo secret. Generate a real one.");
     }
     if (!raw.APP_URL.startsWith("https://")) {
-      problems.push("APP_URL must use https:// in production.");
+      problems.push(`APP_URL must use https:// in ${where}.`);
     }
+  }
+
+  if (isHostedDemo) {
+    // Demo parents have made-up phone numbers that may belong to real people.
+    const real = (["voice", "whatsapp", "email", "payments"] as const).filter(
+      (n) => states[n] === "real",
+    );
+    if (real.length > 0 || modes.browserVoice === "enabled") {
+      problems.push(
+        `The public demo (APP_ENV=demo) must use the demo mock for every provider, ` +
+          `so it never calls, messages or charges a real person` +
+          (real.length > 0 ? ` (remove the keys for: ${real.join(", ")})` : "") +
+          (modes.browserVoice === "enabled"
+            ? `. Remove ELEVENLABS_API_KEY and ELEVENLABS_AGENT_ID: anyone could spend your credits`
+            : "") +
+          `.`,
+      );
+    }
+  }
+
+  if (isProd) {
     const mocks = (["voice", "whatsapp", "email", "payments"] as const).filter(
       (n) => states[n] === "mock",
     );
     if (mocks.length > 0 && !raw.ALLOW_DEMO_PROVIDERS_IN_PRODUCTION) {
       problems.push(
         `Production is using mock providers (${mocks.join(", ")}). Real families would not ` +
-          `get calls or alerts. Configure them, or set ALLOW_DEMO_PROVIDERS_IN_PRODUCTION=true ` +
-          `for a public demo site only.`,
+          `get calls or alerts. Configure them. (For a public demo website use APP_ENV=demo.)`,
       );
     }
   }
@@ -255,6 +297,8 @@ export function parseEnv(source: Record<string, string | undefined>): AppEnv {
     CRON_SECRET: raw.CRON_SECRET ?? DEMO_CRON_SECRET,
     modes,
     isDemo,
+    isHostedDemo,
+    isPublicSite: isProd || isHostedDemo,
     adminEmails: (raw.ADMIN_EMAILS ?? "")
       .split(",")
       .map((e) => e.trim().toLowerCase())

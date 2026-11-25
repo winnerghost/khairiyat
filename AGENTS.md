@@ -30,7 +30,7 @@ Families trust us with their parents' wellbeing. Reliability, privacy and honest
 - Brand name, colours and assistant names live only in `src/config/brand.ts`.
 - Every external service has an interface in `src/providers/<name>/types.ts` with a mock (demo) and a real implementation.
 - Keep README.md, .env.example, docs/ARCHITECTURE.md, docs/GO_LIVE.md and docs/RUNBOOK.md up to date in the same change.
-- Database changes: edit `src/db/schema/*.ts`, run `npm run db:generate`, and add `ALTER TABLE … ENABLE ROW LEVEL SECURITY` for new tables in the migration (a test checks every table has RLS).
+- Database changes: edit `src/db/schema/*.ts`, run `npm run db:generate`, and add `ALTER TABLE … ENABLE ROW LEVEL SECURITY` for new tables in the migration (a test checks every table has RLS). `db:generate` also copies new migrations to `netlify/database/migrations/` (the public demo's Netlify Database). Never edit a migration once it is committed: write a new one.
 - The demo database lives in `~/.khairiyat/demo-data` (outside the project, so the dev server doesn't reload on writes).
 - Any change in `agent/` must be followed by `npm run agent:sync`; never edit the agent in the ElevenLabs dashboard.
 - Before committing: `npm run format`, then `npm run check` (lint, typecheck, format, tests). Before pushing UI changes: `npm run e2e`. Engine changes: also `npm run simulate:week`.

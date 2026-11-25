@@ -25,6 +25,12 @@ export default async function SignupPage({ searchParams }: PageProps<"/signup">)
           Set up daily check-in calls for your parent in about 5 minutes.
         </p>
       </div>
+      {env.isHostedDemo && (
+        <p className="rounded-xl bg-accent/20 px-3 py-2 text-base">
+          This is a public demo. Use a made-up email, names and phone numbers: other visitors can
+          see demo data, and it is reset from time to time. No one is really called.
+        </p>
+      )}
       <SignupForm next={next} />
       {env.modes.googleAuth === "enabled" && (
         <form action={googleAction}>

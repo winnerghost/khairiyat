@@ -157,7 +157,7 @@ describe("parseEnv: production guard", () => {
       parseEnv({ APP_ENV: "production", APP_URL: "http://insecure.example", ...allProviders }),
     );
     const text = problems.join(" | ");
-    expect(text).toContain("DATABASE_URL is required");
+    expect(text).toContain("DATABASE_URL (or a Netlify Database) is required in production");
     expect(text).toContain("DATA_ENCRYPTION_KEY is required");
     expect(text).toContain("BETTER_AUTH_SECRET is required");
     expect(text).toContain("CRON_SECRET is required");
@@ -166,5 +166,60 @@ describe("parseEnv: production guard", () => {
 
   it("rejects unknown APP_ENV values", () => {
     expect(() => parseEnv({ APP_ENV: "staging" })).toThrow(EnvConfigError);
+  });
+});
+
+describe("parseEnv: public demo website (APP_ENV=demo)", () => {
+  const demoBasics = {
+    APP_ENV: "demo",
+    APP_URL: "https://khairiyat-demo.netlify.app",
+    NETLIFY_DB_URL: "postgres://user:pass@db.netlify.example:5432/main?sslmode=require",
+    DATA_ENCRYPTION_KEY: REAL_KEY,
+    BETTER_AUTH_SECRET: "a-real-long-random-secret-value-1234567890",
+    CRON_SECRET: "a-real-cron-secret",
+  };
+
+  it("runs with mock providers on a Netlify Database", () => {
+    const env = parseEnv(demoBasics);
+    expect(env.isHostedDemo).toBe(true);
+    expect(env.isPublicSite).toBe(true);
+    expect(env.isDemo).toBe(true);
+    expect(env.modes.database).toBe("postgres");
+    expect(env.modes.voice).toBe("mock");
+  });
+
+  it("is not a public site on a laptop or in production checks", () => {
+    expect(parseEnv({}).isPublicSite).toBe(false);
+    expect(parseEnv({}).isHostedDemo).toBe(false);
+    expect(parseEnv({ ...productionBasics, ...allProviders }).isPublicSite).toBe(true);
+  });
+
+  it("needs a shared database, real secrets and https", () => {
+    const problems = problemsOf(() =>
+      parseEnv({ APP_ENV: "demo", APP_URL: "http://khairiyat-demo.example" }),
+    ).join(" | ");
+    expect(problems).toContain("DATABASE_URL (or a Netlify Database) is required");
+    expect(problems).toContain("BETTER_AUTH_SECRET is required in the public demo");
+    expect(problems).toContain("https://");
+  });
+
+  it("refuses the public demo secrets", () => {
+    const problems = problemsOf(() =>
+      parseEnv({ ...demoBasics, BETTER_AUTH_SECRET: DEMO_AUTH_SECRET }),
+    );
+    expect(problems.join(" ")).toContain("public demo secret");
+  });
+
+  it("never uses real providers, so no real person is called or messaged", () => {
+    const problems = problemsOf(() => parseEnv({ ...demoBasics, ...allProviders })).join(" ");
+    expect(problems).toContain("must use the demo mock for every provider");
+    expect(problems).toContain("voice, whatsapp, email, payments");
+  });
+
+  it("refuses the browser voice demo (visitors would spend your ElevenLabs credits)", () => {
+    const problems = problemsOf(() =>
+      parseEnv({ ...demoBasics, ELEVENLABS_API_KEY: "k", ELEVENLABS_AGENT_ID: "agent_1" }),
+    ).join(" ");
+    expect(problems).toContain("anyone could spend your credits");
   });
 });

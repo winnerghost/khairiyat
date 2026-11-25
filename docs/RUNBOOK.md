@@ -67,3 +67,14 @@ Written for a stressful moment: short steps, simplest fix first.
 - **"Demo accounts not found":** `npm run seed`.
 - **Start the demo from scratch:** Demo room → Reset all demo data, or delete `~/.khairiyat/demo-data`.
 - **No pretend calls happen:** it must be 8 am–8 pm in the parent's time zone (hard rule). Change the parent's time zone in Call time settings.
+
+## 8. The public demo website (Netlify)
+
+**https://khairiyat-demo.netlify.app** runs with `APP_ENV=demo` on Netlify's free plan, with a Netlify Database. Every provider is the mock: nobody is ever called or messaged. See [ARCHITECTURE.md §8](ARCHITECTURE.md).
+
+- **"Getting the demo ready" for a long time:** each page load builds about 8 seconds of the demo. The page refreshes itself; if it stopped, reload. A replay after weeks without visitors covers at most the last 14 days.
+- **Start the demo from scratch:** log in with a demo account → Demo room → **Reset all demo data**. The next page loads rebuild it.
+- **Site shows "Site not available":** the Netlify team ran out of its **300 free credits** for the month. This pauses **every** site on the team until the next cycle. Costs: a production deploy 15 credits; database and function time 10 credits per hour of compute; the database sleeps after 5 minutes without visitors. Check usage on the team's billing page. Deploy rarely, and prefer deploy previews (free) for testing.
+- **Redeploy after a code change:** in Netlify, the site `khairiyat-demo` → Deploys. Migrations in `netlify/database/migrations/` are applied on deploy; a failed migration blocks the deploy (read its log).
+- **Site settings (Netlify → khairiyat-demo → Environment variables):** `APP_ENV=demo`, `APP_URL=https://khairiyat-demo.netlify.app`, `DATA_ENCRYPTION_KEY`, `BETTER_AUTH_SECRET`, `CRON_SECRET` (random, secret). Never add provider keys: the app refuses to start with them in demo mode.
+- **Take it offline:** Netlify → khairiyat-demo → Project configuration → Delete project (this also deletes its database).

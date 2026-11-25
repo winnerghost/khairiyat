@@ -52,7 +52,8 @@ flowchart LR
 - no keys → **mock** (demo)
 - all keys → **real**
 - some keys → **refuse to start** (a half-configured provider must never silently drop alerts)
-- production + mock providers → refuse to start (unless `ALLOW_DEMO_PROVIDERS_IN_PRODUCTION=true` for a public demo site)
+- production + mock providers → refuse to start (unless `ALLOW_DEMO_PROVIDERS_IN_PRODUCTION=true`)
+- `APP_ENV=demo` (the public demo website) + any real provider, or the browser voice → refuse to start: demo parents have made-up numbers that may belong to real people, and visitors must not spend ElevenLabs credits
 - only `ELEVENLABS_API_KEY` + `ELEVENLABS_AGENT_ID` → calls stay simulated, but "Talk to Roshni" in the browser works
 
 | Provider | Interface                                                                 | Real                                                    | Mock                                                                                                                          |
@@ -150,6 +151,19 @@ Before each call: `first_message` (scripted greeting with AI disclosure), `paren
 | Load                                 | `npm run loadtest:tick`: 1,000 parents                                                                                                                                                                      |
 | e2e (Playwright, 390px + desktop)    | sign up → onboarding → introduction call → red-flag call → summary + alert → phone preview → payment → export → delete; demo/admin; privacy redirects                                                       |
 
-## 8. Production layout (when going live)
+## 8. The public demo website (`APP_ENV=demo`, Netlify)
+
+The online demo (https://khairiyat-demo.netlify.app) is the same app with every provider mocked, on serverless hosting:
+
+- **Database:** the site's **Netlify Database** (Postgres). Netlify sets `NETLIFY_DB_URL` and applies `netlify/database/migrations/` on each deploy. Those files are exact copies of `drizzle/` (`npm run db:generate` copies new ones; `tests/unit/netlify-migrations.test.ts` checks), and the app does not run its own migrator there.
+- **No background scheduler.** A per-minute scheduled function would keep the database awake all day and use up the free plan's credits. Instead `src/server/demo-world.ts` moves the demo forward when someone opens a page (`DemoWorldGate` in the auth, family app, admin and demo layouts):
+  - first visit: create the families, then build three weeks of history **in steps of about 8 seconds per page load** (progress screen; Netlify functions stop at 60 s). `continueDemoWorld()` resumes from the last tick, and the scenario plan is stored in `app_settings.demo_world`;
+  - a quiet period of 15+ minutes: replay it the same way;
+  - otherwise: one normal tick after the response (`after()`), at most every 4 seconds. Pages refresh themselves while a pretend call runs.
+  - a `demo-world` lease lets only one request move the world at a time. The database still enforces the hard rules.
+- The landing page starts the build in the background, so the demo is usually ready by the time someone clicks "Log in".
+- Public-site settings: secure cookies, login rate limits, `robots.txt` disallows everything, and visitors are told not to enter real details.
+
+## 9. Production layout (when going live)
 
 Recommended free-to-start setup: **Supabase** (Postgres in Mumbai) + **Netlify** (website), with **pg_cron** calling `POST /api/cron/tick` every minute (`supabase/sql/cron.sql`). If the website host ever becomes a bottleneck, the runtime-agnostic engine can move into Supabase Edge Functions without changes to its logic. See [GO_LIVE.md](GO_LIVE.md).

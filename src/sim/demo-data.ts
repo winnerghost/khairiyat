@@ -11,6 +11,7 @@ import { DEFAULT_PLANS } from "@/config/defaults";
 import { ensureReferenceData } from "@/db/bootstrap";
 import {
   alerts,
+  appSettings,
   emergencyContacts,
   familyMembers,
   familyNotes,
@@ -27,6 +28,7 @@ import { account, user } from "@/db/schema/auth";
 import type { Db } from "@/db/types";
 import { FakeClock } from "@/engine/clock";
 import type { EngineDeps } from "@/engine/deps";
+import { runTick } from "@/engine/tick";
 import { encryptText } from "@/lib/crypto";
 import { createLogger } from "@/lib/logger";
 import { addDaysToLocalDate, localDateOf } from "@/lib/time";
@@ -380,18 +382,65 @@ export interface SeedResult {
   ticks: number;
 }
 
+interface DemoOptions {
+  now: Date;
+  encryptionKey: string;
+  appUrl: string;
+}
+
+/**
+ * Where the demo world's history build stands (app_settings "demo_world").
+ * Kept in the database so the hosted demo can build it over several
+ * requests: each one runs the engine a few seconds further.
+ */
+interface DemoWorldMarker {
+  /** First moment of simulated history. */
+  start: string;
+  /** "Now" when the demo was created: planned scenarios count days back from it. */
+  anchor: string;
+  done: boolean;
+  /** parentId → local date → forced scenario (the fall yesterday, the opt-out…). */
+  plans: Record<string, Record<string, Scenario>>;
+  /** parentId → the scenarios that parent's calls usually follow. */
+  styles: Record<string, Scenario[]>;
+}
+
+const WORLD_KEY = "demo_world";
+
+async function readMarker(db: Db): Promise<DemoWorldMarker | null> {
+  const [row] = await db.select().from(appSettings).where(eq(appSettings.key, WORLD_KEY));
+  return (row?.value as DemoWorldMarker | undefined) ?? null;
+}
+
+async function writeMarker(db: Db, marker: DemoWorldMarker): Promise<void> {
+  await db
+    .insert(appSettings)
+    .values({ key: WORLD_KEY, value: marker })
+    .onConflictDoUpdate({ target: appSettings.key, set: { value: marker, updatedAt: new Date() } });
+}
+
 /**
  * Wipe and rebuild all demo data, ending at `now`.
  * `days` limits how much history is simulated (smaller = faster, e.g. for e2e tests).
  */
-export async function seedDemo(
+export async function seedDemo(db: Db, opts: DemoOptions & { days?: number }): Promise<SeedResult> {
+  const created = await startDemoWorld(db, opts);
+  const { ticks } = await continueDemoWorld(db, opts);
+  return { ...created, ticks };
+}
+
+/**
+ * Step 1 of the demo (fast): wipe, then create the families, parents,
+ * medicines and subscriptions as they were `days` ago. The history is made
+ * by continueDemoWorld().
+ */
+export async function startDemoWorld(
   db: Db,
-  opts: { now: Date; days?: number; encryptionKey: string; appUrl: string },
-): Promise<SeedResult> {
+  opts: DemoOptions & { days?: number },
+): Promise<{ families: number; parents: number }> {
   const maxDays = opts.days ?? 21;
   await wipeDemoData(db);
   const start = new Date(opts.now.getTime() - maxDays * 24 * 3600_000);
-  const clock = new FakeClock(start);
   const DAY = 24 * 3600_000;
 
   const plans: Record<string, Record<string, Scenario>> = {}; // parentId → localDate → scenario
@@ -567,20 +616,90 @@ export async function seedDemo(
     }
   }
 
-  // Run the real engine through the past days.
-  const rand = prng(7);
+  await writeMarker(db, {
+    start: start.toISOString(),
+    anchor: opts.now.toISOString(),
+    done: false,
+    plans,
+    styles,
+  });
+  return { families: FAMILIES.length, parents: parentCount };
+}
+
+export interface DemoProgress {
+  /** "seed": building the first history. "catch_up": replaying time nobody visited. */
+  kind: "seed" | "catch_up" | "none";
+  /** True when the demo world has reached `now`. */
+  done: boolean;
+  ticks: number;
+  /** Seed only: share of the history built so far (0–1). */
+  progress: number;
+  /** Simulated time still to replay, in minutes. */
+  minutesLeft: number;
+}
+
+/**
+ * Step 2: run the REAL engine through virtual time up to `now`, either the
+ * first history (after startDemoWorld) or the time since the demo last ran.
+ * With `budgetMs` it stops after about that long; call it again to go on.
+ */
+export async function continueDemoWorld(
+  db: Db,
+  opts: DemoOptions & { budgetMs?: number },
+): Promise<DemoProgress> {
+  const marker = await readMarker(db);
+  if (marker && !marker.done) return continueSeed(db, marker, opts);
+  const r = await catchUpDemo(db, opts);
+  if (!r) return { kind: "none", done: true, ticks: 0, progress: 1, minutesLeft: 0 };
+  return { kind: "catch_up", ...r };
+}
+
+/**
+ * Fast-forward jumps over quiet hours, so its last tick can be well before
+ * `now`. One tick at `now` records that the world is up to date.
+ */
+async function finalTick(deps: EngineDeps, clock: FakeClock, now: Date): Promise<void> {
+  clock.set(now);
+  await runTick(deps);
+}
+
+function stopAfter(budgetMs: number | undefined): (() => boolean) | undefined {
+  if (budgetMs === undefined) return undefined;
+  const until = performance.now() + budgetMs;
+  return () => performance.now() > until;
+}
+
+async function lastTickAt(db: Db): Promise<Date | null> {
+  const [last] = await db
+    .select({ t: jobRuns.startedAt })
+    .from(jobRuns)
+    .orderBy(desc(jobRuns.startedAt))
+    .limit(1);
+  return last?.t ?? null;
+}
+
+async function continueSeed(
+  db: Db,
+  marker: DemoWorldMarker,
+  opts: DemoOptions & { budgetMs?: number },
+): Promise<DemoProgress> {
+  const start = new Date(marker.start);
+  const last = await lastTickAt(db);
+  const from = new Date(Math.max(start.getTime(), last?.getTime() ?? 0));
+  const clock = new FakeClock(from);
+  const rand = prng(7 + (Math.floor(from.getTime() / 60_000) % 9973));
   const deps: EngineDeps = {
     db,
     clock,
     voice: createMockVoiceProvider(db, clock, {
       resultDelaySecs: (_s, talk) => talk + 15,
-      seed: 11,
+      seed: 11 + (Math.floor(from.getTime() / 60_000) % 9973),
       chooseScenario: (input, r) => {
         const date = localDateOf(clock.now(), "Asia/Kolkata");
-        const planned = plans[input.meta.parentId]?.[date];
+        const planned = marker.plans[input.meta.parentId]?.[date];
         if (planned) return planned;
         if (input.dynamicVariables["is_consent_call"] === "yes") return "consent_yes";
-        const style = styles[input.meta.parentId] ?? [];
+        const style = marker.styles[input.meta.parentId] ?? [];
         if (style.length && r() < 0.85) return style[Math.floor(rand() * style.length)]!;
         return demoScenarioChooser(input, r);
       },
@@ -591,7 +710,23 @@ export async function seedDemo(
     appUrl: opts.appUrl,
     encryptionKey: opts.encryptionKey,
   };
-  const { ticks } = await fastForward(deps, clock, opts.now, { maxStepMinutes: 120 });
+  const { ticks, reached } = await fastForward(deps, clock, opts.now, {
+    maxStepMinutes: 120,
+    shouldStop: stopAfter(opts.budgetMs),
+  });
+
+  const total = Math.max(1, opts.now.getTime() - start.getTime());
+  if (reached) await finalTick(deps, clock, opts.now);
+  if (!reached) {
+    const at = clock.now().getTime();
+    return {
+      kind: "seed",
+      done: false,
+      ticks,
+      progress: Math.min(0.99, (at - start.getTime()) / total),
+      minutesLeft: Math.round((opts.now.getTime() - at) / 60_000),
+    };
+  }
 
   // Families have looked at older alerts already.
   await db
@@ -600,28 +735,33 @@ export async function seedDemo(
     .where(
       and(
         eq(alerts.status, "open"),
-        lt(alerts.createdAt, new Date(opts.now.getTime() - 1.5 * DAY)),
+        lt(alerts.createdAt, new Date(opts.now.getTime() - 1.5 * 24 * 3600_000)),
       ),
     );
-
-  return { families: FAMILIES.length, parents: parentCount, ticks };
+  await writeMarker(db, { ...marker, done: true });
+  return { kind: "seed", done: true, ticks, progress: 1, minutesLeft: 0 };
 }
+
+/** A gap shorter than this is handled by one normal tick (it catches up by itself). */
+export const CATCH_UP_AFTER_MINUTES = 15;
 
 /** Demo start-up: if the demo hasn't run for a while, replay the missing time. */
 export async function catchUpDemo(
   db: Db,
-  opts: { now: Date; encryptionKey: string; appUrl: string; maxDays?: number },
-): Promise<{ ticks: number; fromMinutesAgo: number } | null> {
-  const [last] = await db
-    .select({ t: jobRuns.startedAt })
-    .from(jobRuns)
-    .orderBy(desc(jobRuns.startedAt))
-    .limit(1);
+  opts: DemoOptions & { maxDays?: number; budgetMs?: number },
+): Promise<{
+  ticks: number;
+  fromMinutesAgo: number;
+  done: boolean;
+  progress: number;
+  minutesLeft: number;
+} | null> {
+  const last = await lastTickAt(db);
   if (!last) return null;
-  const gapMin = (opts.now.getTime() - last.t.getTime()) / 60_000;
-  if (gapMin < 15) return null;
+  const gapMin = (opts.now.getTime() - last.getTime()) / 60_000;
+  if (gapMin < CATCH_UP_AFTER_MINUTES) return null;
   const from = new Date(
-    Math.max(last.t.getTime(), opts.now.getTime() - (opts.maxDays ?? 14) * 24 * 3600_000),
+    Math.max(last.getTime(), opts.now.getTime() - (opts.maxDays ?? 14) * 24 * 3600_000),
   );
   const clock = new FakeClock(from);
   const deps: EngineDeps = {
@@ -637,11 +777,65 @@ export async function catchUpDemo(
     appUrl: opts.appUrl,
     encryptionKey: opts.encryptionKey,
   };
-  const { ticks } = await fastForward(deps, clock, opts.now, { maxStepMinutes: 120 });
-  return { ticks, fromMinutesAgo: Math.round(gapMin) };
+  const { ticks, reached } = await fastForward(deps, clock, opts.now, {
+    maxStepMinutes: 120,
+    shouldStop: stopAfter(opts.budgetMs),
+  });
+  if (reached) await finalTick(deps, clock, opts.now);
+  const total = Math.max(1, opts.now.getTime() - from.getTime());
+  const at = reached ? opts.now.getTime() : clock.now().getTime();
+  return {
+    ticks,
+    fromMinutesAgo: Math.round(gapMin),
+    done: reached,
+    progress: reached ? 1 : Math.min(0.99, (at - from.getTime()) / total),
+    minutesLeft: Math.round((opts.now.getTime() - at) / 60_000),
+  };
 }
 
 export async function hasAnyUsers(db: Db): Promise<boolean> {
   const rows = await db.select({ id: user.id }).from(user).limit(1);
   return rows.length > 0;
+}
+
+export type DemoWorldNeed =
+  | { need: "start" }
+  | { need: "continue"; kind: "seed" | "catch_up"; progress: number; minutesLeft: number }
+  | { need: "tick" }
+  | { need: "nothing" };
+
+/**
+ * What the demo world needs right now (cheap: three small queries).
+ * Used by the hosted demo, which has no background scheduler.
+ */
+export async function demoWorldNeed(
+  db: Db,
+  now: Date,
+  tickEveryMs: number,
+): Promise<DemoWorldNeed> {
+  if (!(await hasAnyUsers(db))) return { need: "start" };
+  const marker = await readMarker(db);
+  const last = await lastTickAt(db);
+  const minutesLeft = (from: number) => Math.round((now.getTime() - from) / 60_000);
+  if (marker && !marker.done) {
+    const start = new Date(marker.start).getTime();
+    const at = Math.max(start, last?.getTime() ?? 0);
+    return {
+      need: "continue",
+      kind: "seed",
+      progress: Math.min(0.99, (at - start) / Math.max(1, now.getTime() - start)),
+      minutesLeft: minutesLeft(at),
+    };
+  }
+  if (!last) return { need: "tick" };
+  const gapMs = now.getTime() - last.getTime();
+  if (gapMs >= CATCH_UP_AFTER_MINUTES * 60_000) {
+    return {
+      need: "continue",
+      kind: "catch_up",
+      progress: 0,
+      minutesLeft: minutesLeft(last.getTime()),
+    };
+  }
+  return gapMs >= tickEveryMs ? { need: "tick" } : { need: "nothing" };
 }

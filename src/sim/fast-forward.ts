@@ -28,6 +28,11 @@ export interface FastForwardOptions {
   maxStepMinutes?: number;
   /** Called after every tick (simulation checks invariants here). */
   onTick?: (stats: TickStats, now: Date) => Promise<void> | void;
+  /**
+   * Checked after every tick: return true to stop early (the hosted demo
+   * advances in short steps). The next run resumes from the last tick.
+   */
+  shouldStop?: () => boolean;
 }
 
 async function nextScheduledCall(db: DbOrTx, now: Date): Promise<number | null> {
@@ -89,7 +94,7 @@ export async function fastForward(
   clock: FakeClock,
   until: Date,
   opts: FastForwardOptions = {},
-): Promise<{ ticks: number }> {
+): Promise<{ ticks: number; reached: boolean }> {
   const maxStep = (opts.maxStepMinutes ?? 60) * 60_000;
   const settings = await getSettings(deps.db);
   let ticks = 0;
@@ -106,6 +111,7 @@ export async function fastForward(
     target = Math.ceil(target / 60_000) * 60_000;
     clock.set(new Date(Math.min(target, until.getTime())));
     if (target >= until.getTime()) break;
+    if (opts.shouldStop?.()) return { ticks, reached: false };
   }
-  return { ticks };
+  return { ticks, reached: true };
 }

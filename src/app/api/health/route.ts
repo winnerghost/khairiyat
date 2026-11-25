@@ -28,7 +28,8 @@ export async function GET() {
       .limit(1);
     const ageSecs = last ? Math.round((Date.now() - last.startedAt.getTime()) / 1000) : null;
     // A scheduler that hasn't ticked for 3 minutes is an outage: answer 503 so uptime monitors alert.
-    const schedulerOk = ageSecs !== null && ageSecs <= 180;
+    // (The public demo website has no scheduler: it moves forward when someone visits.)
+    const schedulerOk = env.isHostedDemo || (ageSecs !== null && ageSecs <= 180);
     return Response.json(
       {
         status: schedulerOk ? "ok" : "scheduler_stale",
@@ -36,7 +37,11 @@ export async function GET() {
         environment: env.APP_ENV,
         demo: env.isDemo,
         modes: env.modes,
-        scheduler: { lastTickSecondsAgo: ageSecs, lastTickOk: last?.ok ?? null },
+        scheduler: {
+          mode: env.isHostedDemo ? "on_visit" : "every_minute",
+          lastTickSecondsAgo: ageSecs,
+          lastTickOk: last?.ok ?? null,
+        },
         time: new Date().toISOString(),
       },
       { status: schedulerOk ? 200 : 503, headers: { "Cache-Control": "no-store" } },

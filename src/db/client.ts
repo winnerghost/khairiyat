@@ -2,7 +2,13 @@
  * Database connection (Node only: website, scripts, tests).
  *
  * - DATABASE_URL set   → real Postgres (Supabase in production)
- * - DATABASE_URL empty → PGlite: real Postgres running inside Node, stored in
+ * - NETLIFY_DB_URL set → the site's Netlify Database (public demo website).
+ *                        Netlify applies the migrations on deploy from
+ *                        netlify/database/migrations (copies of drizzle/,
+ *                        kept identical by `npm run db:generate` and a test),
+ *                        so the app must not run its own migrator there:
+ *                        https://docs.netlify.com/build/data-and-storage/netlify-database/
+ * - both empty         → PGlite: real Postgres running inside Node, stored in
  *                        ~/.khairiyat/demo-data (or in memory with PGLITE_DATA_DIR=memory://).
  *                        It lives outside the project folder on purpose: the dev
  *                        server watches the project and would reload on every write.
@@ -34,7 +40,10 @@ export interface OpenDbOptions {
   databaseUrl?: string;
   /** PGlite directory, or "memory://" for a throwaway in-memory database. */
   pgliteDataDir?: string;
+  /** Run drizzle/ migrations and insert reference data (default true). */
   migrate?: boolean;
+  /** Insert reference data without migrating (the host applies migrations). */
+  referenceDataOnly?: boolean;
 }
 
 const MIGRATIONS_FOLDER = path.join(process.cwd(), "drizzle");
@@ -48,10 +57,15 @@ export async function openDb(options: OpenDbOptions = {}): Promise<DbHandle> {
       // Supabase's pooler (transaction mode) does not support prepared statements.
       prepare: false,
       max: 5,
+      // Serverless instances sleep: drop idle connections instead of keeping them.
+      idle_timeout: 20,
+      connect_timeout: 15,
       onnotice: () => {},
     });
     const db = drizzlePostgres(client, { schema });
-    if (shouldMigrate) {
+    if (options.referenceDataOnly) {
+      await ensureReferenceData(db as unknown as Db);
+    } else if (shouldMigrate) {
       await migratePostgres(db, { migrationsFolder: MIGRATIONS_FOLDER });
       await ensureReferenceData(db as unknown as Db);
     }
@@ -74,9 +88,14 @@ const globalForDb = globalThis as unknown as { __khairiyatDb?: Promise<DbHandle>
 
 export function getDbHandle(): Promise<DbHandle> {
   if (!globalForDb.__khairiyatDb) {
-    const databaseUrl = process.env.DATABASE_URL?.trim() || undefined;
+    const ownUrl = process.env.DATABASE_URL?.trim() || undefined;
+    const netlifyUrl = process.env.NETLIFY_DB_URL?.trim() || undefined;
     const pgliteDataDir = process.env.PGLITE_DATA_DIR?.trim() || undefined;
-    globalForDb.__khairiyatDb = openDb({ databaseUrl, pgliteDataDir }).catch((error: unknown) => {
+    globalForDb.__khairiyatDb = openDb({
+      databaseUrl: ownUrl ?? netlifyUrl,
+      pgliteDataDir,
+      referenceDataOnly: !ownUrl && !!netlifyUrl,
+    }).catch((error: unknown) => {
       globalForDb.__khairiyatDb = undefined; // allow a retry on the next request
       logger.error("database: failed to open", { error });
       throw error;

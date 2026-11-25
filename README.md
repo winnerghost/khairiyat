@@ -8,7 +8,16 @@ It is **not** a medical service, **not** an emergency service, and does not repl
 
 ---
 
-## Run the demo (5 minutes, no accounts)
+## Open the online demo (nothing to install)
+
+**https://khairiyat-demo.netlify.app** — the same demo, hosted on Netlify's free plan.
+
+- Open it on your phone or laptop and press **Log in → "Open the Sharma family demo"** (or **"Open the admin panel"**).
+- The very first visit (and the first visit after a quiet spell) shows **"Getting the demo ready"** for up to a minute while the real call engine builds or replays the pretend calls. There is no server running all the time: the demo moves forward when someone opens it.
+- It's public: use made-up names and numbers if you sign up. Nobody is really called or messaged.
+- How it works and how to redeploy: [docs/ARCHITECTURE.md §8](docs/ARCHITECTURE.md) and [docs/RUNBOOK.md §8](docs/RUNBOOK.md).
+
+## Run the demo on your laptop (5 minutes, no accounts)
 
 You need **Node.js 22** (check with `node -v`). Nothing else: no Docker, no database, no keys.
 
@@ -52,7 +61,7 @@ Calls only happen between **8 am and 8 pm in the parent's time zone**, even in t
 | ------------------------------------ | ------------------------------------------------------------------------------------------ |
 | `npm run demo`                       | Start the app in demo mode                                                                 |
 | `npm run seed`                       | Rebuild demo data (`npm run seed -- 7` for 7 days)                                         |
-| `npm test`                           | 127 unit + integration tests (about a minute)                                              |
+| `npm test`                           | 141 unit + integration tests (about a minute)                                              |
 | `npm run test:pg`                    | The integration tests on a real Postgres (set `TEST_DATABASE_URL`)                         |
 | `npm run e2e`                        | Browser tests on a 390px phone and on desktop (full family journey)                        |
 | `npm run simulate:week`              | 50 pretend parents × 7 pretend days with outages and lost messages; checks every hard rule |
