@@ -1,0 +1,8 @@
+# Netlify build settings (used by the public demo site, khairiyat-demo).
+# Next.js runs through Netlify's OpenNext adapter, which Netlify adds and
+# updates by itself: https://docs.netlify.com/build/frameworks/framework-setup-guides/nextjs/overview/
+# Site settings such as APP_ENV live in the Netlify UI, not here, so a
+# production site built from this repo is never put in demo mode by accident.
+[build]
+  command = "npm run build"
+  publish = ".next"
